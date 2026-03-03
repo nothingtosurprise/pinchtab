@@ -19,7 +19,6 @@ jobs:
   docs-validate:
     name: Validate Documentation
     runs-on: ubuntu-latest
-    # Skip CI on draft PRs to reduce build costs during development
     if: github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
