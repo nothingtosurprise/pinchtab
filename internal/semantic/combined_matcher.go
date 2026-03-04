@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"context"
+	"fmt"
 	"sort"
 )
 
@@ -70,10 +71,20 @@ func (c *CombinedMatcher) Find(ctx context.Context, query string, elements []Ele
 	embCh := make(chan matcherResult, 1)
 
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				lexCh <- matcherResult{err: fmt.Errorf("lexical matcher panic: %v", p)}
+			}
+		}()
 		r, err := c.lexical.Find(ctx, query, elements, internalOpts)
 		lexCh <- matcherResult{r, err}
 	}()
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				embCh <- matcherResult{err: fmt.Errorf("embedding matcher panic: %v", p)}
+			}
+		}()
 		r, err := c.embedding.Find(ctx, query, elements, internalOpts)
 		embCh <- matcherResult{r, err}
 	}()

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -42,7 +43,7 @@ func runBridgeServer(cfg *config.RuntimeConfig) {
 	// HTTP server
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           loggingMiddleware(mux),
+		Handler:           recoveryMiddleware(loggingMiddleware(mux)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -85,6 +86,26 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			"status", recorder.statusCode,
 			"ms", time.Since(start).Milliseconds(),
 		)
+	})
+}
+
+// recoveryMiddleware catches panics in HTTP handlers and returns a 500
+// instead of crashing the bridge process. Go's net/http server only
+// recovers panics in the serve goroutine; this middleware provides the
+// same guarantee for the handler level and logs the panic for debugging.
+func recoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("handler panic recovered",
+					"method", r.Method,
+					"path", r.URL.Path,
+					"panic", fmt.Sprintf("%v", p),
+				)
+				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
 	})
 }
 

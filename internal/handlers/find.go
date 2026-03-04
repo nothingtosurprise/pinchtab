@@ -74,7 +74,8 @@ func (h *Handlers) HandleFind(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve tab context to get the resolved ID for cache lookup.
-	_, resolvedTabID, err := h.Bridge.TabContext(req.TabID)
+	// Keep ctxTab so we can reuse it for CDP operations (e.g. auto-refresh).
+	ctxTab, resolvedTabID, err := h.Bridge.TabContext(req.TabID)
 	if err != nil {
 		web.Error(w, 404, err)
 		return
@@ -83,9 +84,10 @@ func (h *Handlers) HandleFind(w http.ResponseWriter, r *http.Request) {
 	// Try cached snapshot first; auto-fetch if not available.
 	nodes := h.resolveSnapshotNodes(resolvedTabID)
 	if len(nodes) == 0 {
-		// Auto-refresh: take a fresh snapshot via CDP.
-		ctx, _, _ := h.Bridge.TabContext(resolvedTabID)
-		h.refreshRefCache(ctx, resolvedTabID)
+		// Auto-refresh: take a fresh snapshot via CDP using the context
+		// obtained from the initial TabContext call (resolvedTabID is the
+		// raw CDPID and cannot be passed to TabContext again).
+		h.refreshRefCache(ctxTab, resolvedTabID)
 		nodes = h.resolveSnapshotNodes(resolvedTabID)
 	}
 	if len(nodes) == 0 {
