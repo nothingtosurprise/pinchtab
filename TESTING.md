@@ -1,9 +1,27 @@
 # Testing
 
+## Quick Start with pdev
+
+The `pdev` developer toolkit is the easiest way to run checks and tests:
+
+```bash
+./pdev                    # Interactive picker
+./pdev test               # All tests (unit + integration)
+./pdev test unit          # Unit tests only
+./pdev test integration   # Integration tests only
+./pdev check              # All checks (format, vet, build, test, lint)
+./pdev check go           # Go checks only
+./pdev check security     # Gosec security scan
+./pdev hooks              # Install git hooks (pre-commit)
+./pdev doctor             # Setup dev environment
+```
+
 ## Unit Tests
 
 ```bash
 go test ./...
+# or
+./pdev test unit
 ```
 
 ## Integration Tests
@@ -12,6 +30,8 @@ Integration tests launch a real pinchtab server with Chrome and run HTTP-level t
 
 ```bash
 go test -tags integration ./tests/integration/ -v -timeout 5m
+# or
+./pdev test integration
 ```
 
 ### Environment Variables
