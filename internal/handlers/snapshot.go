@@ -13,6 +13,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/pinchtab/pinchtab/internal/bridge"
+	"github.com/pinchtab/pinchtab/internal/idpi"
 	"github.com/pinchtab/pinchtab/internal/web"
 	"gopkg.in/yaml.v3"
 )
@@ -199,6 +200,40 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 		chromedp.Title(&title),
 	)
 
+	// IDPI: scan accessibility-tree node names and values for injection patterns.
+	// The scan runs after the snapshot is built so truncation has already reduced
+	// the corpus. Headers are set before any write so they always reach the client.
+	var idpiResult idpi.CheckResult
+	if h.Config.IDPI.Enabled && h.Config.IDPI.ScanContent {
+		var sb strings.Builder
+		for _, n := range flat {
+			// Join Name and Value within the same node with a space so multi-word
+			// fields are scanned as a unit. Separate different nodes with \n so
+			// that injection phrases split across node boundaries are not merged
+			// into a false positive by the concatenation.
+			if n.Name != "" || n.Value != "" {
+				sb.WriteString(n.Name)
+				if n.Name != "" && n.Value != "" {
+					sb.WriteByte(' ')
+				}
+				sb.WriteString(n.Value)
+				sb.WriteByte('\n')
+			}
+		}
+		idpiResult = idpi.ScanContent(sb.String(), h.Config.IDPI)
+		if idpiResult.Blocked {
+			web.Error(w, http.StatusForbidden,
+				fmt.Errorf("snapshot blocked by IDPI scanner: %s", idpiResult.Reason))
+			return
+		}
+		if idpiResult.Threat {
+			w.Header().Set("X-IDPI-Warning", idpiResult.Reason)
+			if idpiResult.Pattern != "" {
+				w.Header().Set("X-IDPI-Pattern", idpiResult.Pattern)
+			}
+		}
+	}
+
 	if output == "file" {
 		snapshotDir := filepath.Join(h.Config.StateDir, "snapshots")
 		if err := os.MkdirAll(snapshotDir, 0750); err != nil {
@@ -367,6 +402,9 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 		if truncated {
 			resp["truncated"] = true
 			resp["maxTokens"] = maxTokens
+		}
+		if idpiResult.Threat {
+			resp["idpiWarning"] = idpiResult.Reason
 		}
 		web.JSON(w, 200, resp)
 	}

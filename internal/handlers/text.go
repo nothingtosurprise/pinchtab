@@ -9,6 +9,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/pinchtab/pinchtab/internal/assets"
+	"github.com/pinchtab/pinchtab/internal/idpi"
 	"github.com/pinchtab/pinchtab/internal/web"
 )
 
@@ -71,6 +72,29 @@ func (h *Handlers) HandleText(w http.ResponseWriter, r *http.Request) {
 		chromedp.Title(&title),
 	)
 
+	// IDPI: scan extracted text for injection patterns before it reaches the caller.
+	var idpiResult idpi.CheckResult
+	if h.Config.IDPI.Enabled && h.Config.IDPI.ScanContent {
+		idpiResult = idpi.ScanContent(text, h.Config.IDPI)
+		if idpiResult.Blocked {
+			web.Error(w, http.StatusForbidden,
+				fmt.Errorf("content blocked by IDPI scanner: %s", idpiResult.Reason))
+			return
+		}
+		if idpiResult.Threat {
+			w.Header().Set("X-IDPI-Warning", idpiResult.Reason)
+			if idpiResult.Pattern != "" {
+				w.Header().Set("X-IDPI-Pattern", idpiResult.Pattern)
+			}
+		}
+	}
+
+	// IDPI: wrap plain-text content in <untrusted_web_content> delimiters so
+	// downstream LLMs treat it as data, not instructions.
+	if h.Config.IDPI.Enabled && h.Config.IDPI.WrapContent {
+		text = idpi.WrapContent(text, url)
+	}
+
 	if format == "text" || format == "plain" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
@@ -78,12 +102,16 @@ func (h *Handlers) HandleText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	web.JSON(w, 200, map[string]any{
+	resp := map[string]any{
 		"url":       url,
 		"title":     title,
 		"text":      text,
 		"truncated": truncated,
-	})
+	}
+	if idpiResult.Threat {
+		resp["idpiWarning"] = idpiResult.Reason
+	}
+	web.JSON(w, 200, resp)
 }
 
 // HandleTabText extracts text for a tab identified by path ID.

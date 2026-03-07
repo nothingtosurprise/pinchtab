@@ -15,6 +15,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/pinchtab/pinchtab/internal/bridge"
+	"github.com/pinchtab/pinchtab/internal/idpi"
 	"github.com/pinchtab/pinchtab/internal/web"
 )
 
@@ -158,6 +159,13 @@ func (h *Handlers) HandleNavigate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		// IDPI: block or warn on non-whitelisted domains before the tab opens.
+		if result := idpi.CheckDomain(req.URL, h.Config.IDPI); result.Blocked {
+			web.Error(w, http.StatusForbidden, fmt.Errorf("navigation blocked by IDPI: %s", result.Reason))
+			return
+		} else if result.Threat {
+			w.Header().Set("X-IDPI-Warning", result.Reason)
+		}
 		// CreateTab returns hash-based tab ID directly (e.g., "tab_XXXXXXXX")
 		hashTabID, newCtx, _, err := h.Bridge.CreateTab(req.URL)
 		if err != nil {
@@ -200,6 +208,14 @@ func (h *Handlers) HandleNavigate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		web.Error(w, 404, err)
 		return
+	}
+
+	// IDPI: domain whitelist check also applies when re-navigating an existing tab.
+	if result := idpi.CheckDomain(req.URL, h.Config.IDPI); result.Blocked {
+		web.Error(w, http.StatusForbidden, fmt.Errorf("navigation blocked by IDPI: %s", result.Reason))
+		return
+	} else if result.Threat {
+		w.Header().Set("X-IDPI-Warning", result.Reason)
 	}
 
 	tCtx, tCancel := context.WithTimeout(ctx, navTimeout)

@@ -64,6 +64,9 @@ type RuntimeConfig struct {
 	AttachEnabled      bool
 	AttachAllowHosts   []string
 	AttachAllowSchemes []string
+
+	// IDPI (Indirect Prompt Injection defense) settings
+	IDPI IDPIConfig
 }
 
 // --- Nested FileConfig structure (PR #91 model) ---
@@ -121,11 +124,45 @@ type ProfilesConfig struct {
 
 // SecurityConfig holds security/permission settings.
 type SecurityConfig struct {
-	AllowEvaluate   *bool `json:"allowEvaluate,omitempty"`
-	AllowMacro      *bool `json:"allowMacro,omitempty"`
-	AllowScreencast *bool `json:"allowScreencast,omitempty"`
-	AllowDownload   *bool `json:"allowDownload,omitempty"`
-	AllowUpload     *bool `json:"allowUpload,omitempty"`
+	AllowEvaluate   *bool      `json:"allowEvaluate,omitempty"`
+	AllowMacro      *bool      `json:"allowMacro,omitempty"`
+	AllowScreencast *bool      `json:"allowScreencast,omitempty"`
+	AllowDownload   *bool      `json:"allowDownload,omitempty"`
+	AllowUpload     *bool      `json:"allowUpload,omitempty"`
+	IDPI            IDPIConfig `json:"idpi,omitempty"`
+}
+
+// IDPIConfig holds the configuration for the Indirect Prompt Injection (IDPI)
+// defense layer. All fields default to zero/false, making the feature fully
+// opt-in with no change to existing behaviour when Enabled is false.
+type IDPIConfig struct {
+	// Enabled is the master switch. No IDPI checks are performed when false.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// AllowedDomains is a whitelist of permitted navigation targets.
+	// An empty list means all domains are allowed (no restriction).
+	// Patterns support exact matches ("example.com") and single-level wildcard
+	// prefixes ("*.example.com"). The special value "*" allows everything.
+	AllowedDomains []string `json:"allowedDomains,omitempty"`
+
+	// StrictMode controls the response when a threat is detected.
+	// true  → block the request (HTTP 403 for navigation; scan refuses response).
+	// false → allow the request but emit an X-IDPI-Warning response header.
+	StrictMode bool `json:"strictMode,omitempty"`
+
+	// ScanContent enables keyword-pattern scanning on page content returned by
+	// /snapshot and /text. When a known injection phrase is detected the
+	// response is annotated (warn mode) or refused (strict mode).
+	ScanContent bool `json:"scanContent,omitempty"`
+
+	// WrapContent wraps plain-text output from /text in
+	// <untrusted_web_content> XML delimiters and prepends a safety advisory
+	// so downstream LLMs treat the content as data, not as instructions.
+	WrapContent bool `json:"wrapContent,omitempty"`
+
+	// CustomPatterns is a user-extensible list of additional injection-detection
+	// phrases. Matched case-insensitively, same as the built-in patterns.
+	CustomPatterns []string `json:"customPatterns,omitempty"`
 }
 
 // MultiInstanceConfig holds multi-instance orchestration settings.
@@ -498,6 +535,8 @@ func applyFileConfig(cfg *RuntimeConfig, fc *FileConfig) {
 	if fc.Security.AllowUpload != nil {
 		cfg.AllowUpload = *fc.Security.AllowUpload
 	}
+	// IDPI – copy the whole struct; individual fields have safe zero-value defaults.
+	cfg.IDPI = fc.Security.IDPI
 
 	// Browser
 	if fc.Browser.ChromeVersion != "" {

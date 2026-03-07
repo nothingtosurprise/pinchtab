@@ -125,6 +125,40 @@ Read more in the [Core Concepts](https://pinchtab.com/docs/core-concepts) guide.
 
 ---
 
+## Security — Prompt Injection Defense (IDPI)
+
+When an AI agent fetches arbitrary web pages, attackers can embed hidden instructions in the page content that attempt to override the agent's system prompt. PinchTab includes an optional, layered defense against this threat called **IDPI** (Indirect Prompt Injection defense).
+
+Enable it in your `config.json`:
+
+```json
+{
+  "security": {
+    "idpi": {
+      "enabled": true,
+      "allowedDomains": ["github.com", "*.github.com"],
+      "strictMode": false,
+      "scanContent": true,
+      "wrapContent": false,
+      "customPatterns": []
+    }
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Master switch. No IDPI checks are performed when false |
+| `allowedDomains` | `[]` | Navigation whitelist. Patterns: `"example.com"`, `"*.example.com"`, `"*"` |
+| `strictMode` | `false` | `true` = HTTP 403 block; `false` = warn via `X-IDPI-Warning` header |
+| `scanContent` | `false` | Scan `/snapshot` and `/text` responses for injection phrases |
+| `wrapContent` | `false` | Wrap `/text` output in `<untrusted_web_content>` delimiters for downstream LLMs |
+| `customPatterns` | `[]` | Additional injection phrases to detect (case-insensitive) |
+
+All fields default to `false`/empty — existing behaviour is completely unchanged unless you opt in.
+
+---
+
 ## Documentation
 
 Full docs at **[pinchtab.com/docs](https://pinchtab.com/docs)**
