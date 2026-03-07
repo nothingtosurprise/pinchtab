@@ -258,6 +258,88 @@ func TestCLIPress(t *testing.T) {
 	}
 }
 
+// TestCLIClickWithCSS verifies that --css <selector> is forwarded as the
+// "selector" field (not "ref") so that the bridge performs a CSS-based click.
+func TestCLIClickWithCSS(t *testing.T) {
+	m := newMockServer()
+	defer m.close()
+	client := m.server.Client()
+
+	cliAction(client, m.base(), "", "click", []string{"--css", "button.submit"})
+	var body map[string]any
+	_ = json.Unmarshal([]byte(m.lastBody), &body)
+	if body["selector"] != "button.submit" {
+		t.Errorf("expected selector=button.submit, got %v", body["selector"])
+	}
+	if _, hasRef := body["ref"]; hasRef {
+		t.Error("should not set ref when --css is provided")
+	}
+}
+
+// TestCLIClickWithCSS_AndWaitNav verifies that --css and --wait-nav can be
+// combined in any order.
+func TestCLIClickWithCSS_AndWaitNav(t *testing.T) {
+	m := newMockServer()
+	defer m.close()
+	client := m.server.Client()
+
+	cliAction(client, m.base(), "", "click", []string{"--wait-nav", "--css", "#login-btn"})
+	var body map[string]any
+	_ = json.Unmarshal([]byte(m.lastBody), &body)
+	if body["selector"] != "#login-btn" {
+		t.Errorf("expected selector=#login-btn, got %v", body["selector"])
+	}
+	if body["waitNav"] != true {
+		t.Error("expected waitNav=true")
+	}
+}
+
+// TestCLIHoverWithCSS verifies that hover accepts --css <selector>.
+func TestCLIHoverWithCSS(t *testing.T) {
+	m := newMockServer()
+	defer m.close()
+	client := m.server.Client()
+
+	cliAction(client, m.base(), "", "hover", []string{"--css", ".nav-item"})
+	var body map[string]any
+	_ = json.Unmarshal([]byte(m.lastBody), &body)
+	if body["selector"] != ".nav-item" {
+		t.Errorf("expected selector=.nav-item, got %v", body["selector"])
+	}
+}
+
+// TestCLIFocusWithCSS verifies that focus accepts --css <selector>.
+func TestCLIFocusWithCSS(t *testing.T) {
+	m := newMockServer()
+	defer m.close()
+	client := m.server.Client()
+
+	cliAction(client, m.base(), "", "focus", []string{"--css", "input[name='email']"})
+	var body map[string]any
+	_ = json.Unmarshal([]byte(m.lastBody), &body)
+	if body["selector"] != "input[name='email']" {
+		t.Errorf("expected selector=input[name='email'], got %v", body["selector"])
+	}
+}
+
+// TestCLIClickRefStillWorks verifies that positional <ref> args still work
+// when --css is not passed (backwards compatibility).
+func TestCLIClickRefStillWorks(t *testing.T) {
+	m := newMockServer()
+	defer m.close()
+	client := m.server.Client()
+
+	cliAction(client, m.base(), "", "click", []string{"e42"})
+	var body map[string]any
+	_ = json.Unmarshal([]byte(m.lastBody), &body)
+	if body["ref"] != "e42" {
+		t.Errorf("expected ref=e42, got %v", body["ref"])
+	}
+	if _, hasSelector := body["selector"]; hasSelector {
+		t.Error("should not set selector when using ref")
+	}
+}
+
 func TestCLIFill(t *testing.T) {
 	m := newMockServer()
 	defer m.close()

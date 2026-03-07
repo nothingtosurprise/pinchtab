@@ -316,14 +316,29 @@ func cliAction(client *http.Client, base, token, kind string, args []string) {
 
 	switch kind {
 	case "click", "hover", "focus":
-		if len(args) < 1 {
-			fatal("Usage: pinchtab %s <ref> [--wait-nav]", kind)
-		}
-		body["ref"] = args[0]
-		for _, a := range args[1:] {
-			if a == "--wait-nav" {
+		var cssSelector string
+		var refArg string
+		for i := 0; i < len(args); i++ {
+			switch args[i] {
+			case "--css":
+				if i+1 < len(args) {
+					i++
+					cssSelector = args[i]
+				}
+			case "--wait-nav":
 				body["waitNav"] = true
+			default:
+				if refArg == "" {
+					refArg = args[i]
+				}
 			}
+		}
+		if cssSelector != "" {
+			body["selector"] = cssSelector
+		} else if refArg != "" {
+			body["ref"] = refArg
+		} else {
+			fatal("Usage: pinchtab %s <ref> [--css <selector>] [--wait-nav]", kind)
 		}
 	case "type":
 		if len(args) < 2 {

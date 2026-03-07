@@ -70,7 +70,7 @@ func (b *Bridge) InitActionRegistry() {
 			if req.Key == "" {
 				return nil, fmt.Errorf("key required for press")
 			}
-			return map[string]any{"pressed": req.Key}, chromedp.Run(ctx, chromedp.KeyEvent(req.Key))
+			return map[string]any{"pressed": req.Key}, DispatchNamedKey(ctx, req.Key)
 		},
 		ActionFocus: func(ctx context.Context, req ActionRequest) (map[string]any, error) {
 			if req.Selector != "" {
