@@ -5,7 +5,9 @@ set -e
 cd "$(dirname "$0")/.."
 
 # Generate TypeScript types from Go structs (ensures types are in sync)
+# tygo.yaml lives in dashboard/, so run from there
 TYGO="${GOPATH:-$HOME/go}/bin/tygo"
+cd dashboard
 if [ -x "$TYGO" ]; then
   echo "🔄 Generating TypeScript types..."
   "$TYGO" generate
@@ -21,11 +23,10 @@ else
 fi
 
 # Normalize tygo output with prettier so generation doesn't dirty git
-if [ -f "dashboard/src/generated/types.ts" ]; then
-  cd dashboard
+if [ -f "src/generated/types.ts" ]; then
   npx prettier --write src/generated/types.ts 2>/dev/null || true
-  cd ..
 fi
+cd ..
 
 echo "📦 Building React dashboard..."
 cd dashboard

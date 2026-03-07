@@ -6,14 +6,12 @@ on:
     paths:
       - 'dashboard/**'
       - 'internal/api/types/**'
-      - 'tygo.yaml'
       - 'scripts/build-dashboard.sh'
       - '.github/workflows/dashboard.yml'
   pull_request:
     paths:
       - 'dashboard/**'
       - 'internal/api/types/**'
-      - 'tygo.yaml'
       - 'scripts/build-dashboard.sh'
       - '.github/workflows/dashboard.yml'
   workflow_dispatch:
@@ -44,14 +42,12 @@ jobs:
           bun-version: latest
 
       - name: Install tygo
-        working-directory: .
         run: go install github.com/gzuidhof/tygo@latest
 
       - name: Generate dashboard types
-        working-directory: .
         run: |
           "$HOME/go/bin/tygo" generate
-          git diff --exit-code -- dashboard/src/generated/types.ts
+          git diff --exit-code -- src/generated/types.ts
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -86,11 +82,9 @@ jobs:
           bun-version: latest
 
       - name: Install tygo
-        working-directory: .
         run: go install github.com/gzuidhof/tygo@latest
 
       - name: Generate dashboard types
-        working-directory: .
         run: "$HOME/go/bin/tygo" generate
 
       - name: Install dependencies
