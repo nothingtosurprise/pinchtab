@@ -651,7 +651,7 @@ func TestFileExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test non-existent file
 	if fileExists(filepath.Join(tmpDir, "nonexistent.json")) {
@@ -695,7 +695,7 @@ func TestUserConfigDirLegacyConfigFilePriority(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp home: %v", err)
 	}
-	defer os.RemoveAll(tmpHome)
+	defer func() { _ = os.RemoveAll(tmpHome) }()
 
 	// Setup directory structure that mimics the bug scenario:
 	// ~/.pinchtab/config.json exists
