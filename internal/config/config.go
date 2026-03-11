@@ -421,8 +421,8 @@ func homeDir() string {
 // - Linux: ~/.config/pinchtab (or $XDG_CONFIG_HOME/pinchtab)
 // - Windows: %APPDATA%\pinchtab
 //
-// For backwards compatibility, if ~/.pinchtab exists and the new location
-// doesn't, it returns ~/.pinchtab (allowing seamless migration).
+// For backwards compatibility, if ~/.pinchtab/config.json exists and the new location
+// doesn't have a config.json, it returns ~/.pinchtab (allowing seamless migration).
 func userConfigDir() string {
 	home := homeDir()
 	legacyPath := filepath.Join(home, ".pinchtab")
@@ -436,11 +436,13 @@ func userConfigDir() string {
 
 	newPath := filepath.Join(configDir, "pinchtab")
 
-	// Backwards compatibility: if legacy location exists and new doesn't, use legacy
-	legacyExists := dirExists(legacyPath)
-	newExists := dirExists(newPath)
+	// Backwards compatibility: check for config FILE, not just directory.
+	// This handles the case where both directories exist (e.g., ~/.pinchtab for binary
+	// and ~/.config/pinchtab for profiles) but only the legacy has a config.json.
+	legacyConfig := filepath.Join(legacyPath, "config.json")
+	newConfig := filepath.Join(newPath, "config.json")
 
-	if legacyExists && !newExists {
+	if fileExists(legacyConfig) && !fileExists(newConfig) {
 		return legacyPath
 	}
 
@@ -454,6 +456,15 @@ func dirExists(path string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+// fileExists checks if a file exists (not a directory)
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 func (c *RuntimeConfig) ListenAddr() string {
