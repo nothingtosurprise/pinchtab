@@ -40,3 +40,11 @@ pt_post_raw /upload "{broken"
 assert_http_status "400" "rejects bad JSON"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "upload: nonexistent file path → error"
+
+pt_post /upload '{"selector":"#single-file","paths":["/tmp/nonexistent_file_xyz_12345.jpg"]}'
+assert_not_ok "rejects missing file"
+
+end_test

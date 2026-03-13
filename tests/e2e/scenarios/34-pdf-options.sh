@@ -89,3 +89,13 @@ pt_get "/tabs/${TAB_ID}/pdf?preferCSSPageSize=true"
 assert_ok "pdf CSS page size"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pdf: output=file saves to disk"
+
+pt_post /navigate '{"url":"'"${FIXTURES_URL}"'/index.html"}'
+pt_get "/pdf?output=file"
+assert_ok "pdf output=file"
+assert_json_exists "$RESULT" '.path' "has file path"
+
+end_test

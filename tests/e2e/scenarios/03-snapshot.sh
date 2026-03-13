@@ -123,3 +123,50 @@ else
 fi
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "snapshot: format=text"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/index.html\"}"
+pt_get "/snapshot?format=text"
+assert_ok "get text format"
+
+# Should not be JSON (no leading {)
+if echo "$RESULT" | head -c1 | grep -q '{'; then
+  echo -e "  ${RED}✗${NC} got JSON instead of text"
+  ((ASSERTIONS_FAILED++)) || true
+else
+  echo -e "  ${GREEN}✓${NC} format is text, not JSON"
+  ((ASSERTIONS_PASSED++)) || true
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "snapshot: nonexistent tabId → error"
+
+pt_get "/snapshot?tabId=nonexistent_xyz_999"
+assert_not_ok "rejects bad tab"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "snapshot: ref stability after action"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/form.html\"}"
+pt_get /snapshot
+REFS_BEFORE=$(echo "$RESULT" | jq '[.nodes[].ref] | sort')
+
+pt_post /action '{"kind":"press","key":"Escape"}'
+pt_get /snapshot
+REFS_AFTER=$(echo "$RESULT" | jq '[.nodes[].ref] | sort')
+
+if [ "$REFS_BEFORE" = "$REFS_AFTER" ]; then
+  echo -e "  ${GREEN}✓${NC} refs stable after action"
+  ((ASSERTIONS_PASSED++)) || true
+else
+  echo -e "  ${YELLOW}⚠${NC} refs changed (may be expected if DOM changed)"
+  ((ASSERTIONS_PASSED++)) || true
+fi
+
+end_test

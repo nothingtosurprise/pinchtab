@@ -66,3 +66,19 @@ assert_ok "navigate with waitSelector"
 assert_json_contains "$RESULT" '.title' 'Button'
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "navigate: missing URL → error"
+
+pt_post /navigate '{}'
+assert_not_ok "rejects missing URL"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "navigate: bad JSON → 400"
+
+pt_post_raw /navigate '{broken'
+assert_not_ok "rejects bad JSON"
+
+end_test

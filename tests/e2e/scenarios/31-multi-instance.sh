@@ -264,6 +264,14 @@ done
 end_test
 
 # ─────────────────────────────────────────────────────────────────
+start_test "orchestrator: proxy with query params"
+
+pt_post /navigate '{"url":"'"${FIXTURES_URL}"'/index.html?foo=bar&baz=qux"}'
+assert_ok "navigate with query params"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
 start_test "orchestrator: stop non-existent instance"
 
 pt_post "/instances/nonexistent_xyz/stop" '{}'

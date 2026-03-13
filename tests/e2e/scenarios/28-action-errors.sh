@@ -47,3 +47,11 @@ pt_post /actions '{"actions":[]}'
 assert_not_ok "rejects empty batch"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "action: nonexistent tabId → error"
+
+pt_post /action '{"kind":"click","ref":"e0","tabId":"nonexistent_xyz_999"}'
+assert_not_ok "rejects bad tab"
+
+end_test

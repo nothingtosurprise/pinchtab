@@ -69,3 +69,19 @@ assert_ok "tab evaluate"
 assert_result_eq ".result" "6" "1+2+3=6"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "evaluate: missing expression → error"
+
+pt_post /evaluate '{}'
+assert_not_ok "rejects missing expression"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "evaluate: bad JSON → 400"
+
+pt_post_raw /evaluate '{broken'
+assert_not_ok "rejects bad JSON"
+
+end_test
