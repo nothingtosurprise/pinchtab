@@ -12,5 +12,3 @@ assert_output_json
 assert_output_contains "nodes" "returns snapshot nodes"
 
 end_test
-
-# SKIP: snap flags (--text, --interactive, --compact) not yet in cobra refactor
