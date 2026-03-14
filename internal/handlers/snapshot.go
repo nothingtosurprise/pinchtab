@@ -63,8 +63,9 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("filter")
 
 	// --- Lite engine fast path ---
+	tabID := r.URL.Query().Get("tabId")
 	if h.useLite(engine.CapSnapshot, "") {
-		nodes, err := h.Router.Lite().Snapshot(r.Context(), filter)
+		nodes, err := h.Router.Lite().Snapshot(r.Context(), tabID, filter)
 		if err != nil {
 			web.Error(w, 500, fmt.Errorf("lite snapshot: %w", err))
 			return
@@ -85,8 +86,7 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tabID := r.URL.Query().Get("tabId")
-	// filter already parsed above for lite path
+	// filter and tabID already parsed above for lite path
 	doDiff := r.URL.Query().Get("diff") == "true"
 	format := r.URL.Query().Get("format")
 	output := r.URL.Query().Get("output")

@@ -174,6 +174,46 @@ func TestEnvOverridesNestedConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigEngineFromFile(t *testing.T) {
+	clearConfigEnvVars(t)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	_ = os.Setenv("PINCHTAB_CONFIG", configPath)
+	defer func() { _ = os.Unsetenv("PINCHTAB_CONFIG") }()
+
+	if err := os.WriteFile(configPath, []byte(`{"server":{"engine":"lite"}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	if cfg.Engine != "lite" {
+		t.Fatalf("engine = %q, want lite", cfg.Engine)
+	}
+}
+
+func TestLoadConfigEngineEnvOverridesFile(t *testing.T) {
+	clearConfigEnvVars(t)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	_ = os.Setenv("PINCHTAB_CONFIG", configPath)
+	_ = os.Setenv("PINCHTAB_ENGINE", "auto")
+	defer func() {
+		_ = os.Unsetenv("PINCHTAB_CONFIG")
+		_ = os.Unsetenv("PINCHTAB_ENGINE")
+	}()
+
+	if err := os.WriteFile(configPath, []byte(`{"server":{"engine":"lite"}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	if cfg.Engine != "auto" {
+		t.Fatalf("engine = %q, want auto", cfg.Engine)
+	}
+}
+
 func TestApplyFileConfigToRuntimeResetsSecurityFlagsToSafeDefaults(t *testing.T) {
 	cfg := &RuntimeConfig{
 		AllowEvaluate:   true,

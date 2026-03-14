@@ -5,17 +5,67 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/chromedp/cdproto/target"
 	"github.com/pinchtab/pinchtab/internal/bridge"
 	"github.com/pinchtab/pinchtab/internal/config"
+	"github.com/pinchtab/pinchtab/internal/engine"
 )
 
 type failMockBridge struct {
 	bridge.BridgeAPI
 }
+
+type liteActionBridge struct {
+	mockBridge
+	ensureChromeCalled bool
+}
+
+func (m *liteActionBridge) AvailableActions() []string {
+	return []string{bridge.ActionClick, bridge.ActionType, bridge.ActionPress}
+}
+
+func (m *liteActionBridge) EnsureChrome(cfg *config.RuntimeConfig) error {
+	m.ensureChromeCalled = true
+	return fmt.Errorf("ensureChrome should not be called for lite-routed actions")
+}
+
+type fakeLiteEngine struct {
+	clickRefs []string
+	typeCalls []struct {
+		ref  string
+		text string
+	}
+}
+
+func (f *fakeLiteEngine) Name() string { return "lite-test" }
+func (f *fakeLiteEngine) Navigate(ctx context.Context, url string) (*engine.NavigateResult, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (f *fakeLiteEngine) Snapshot(ctx context.Context, tabID, filter string) ([]engine.SnapshotNode, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (f *fakeLiteEngine) Text(ctx context.Context, tabID string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+func (f *fakeLiteEngine) Click(ctx context.Context, tabID, ref string) error {
+	f.clickRefs = append(f.clickRefs, ref)
+	return nil
+}
+func (f *fakeLiteEngine) Type(ctx context.Context, tabID, ref, text string) error {
+	f.typeCalls = append(f.typeCalls, struct {
+		ref  string
+		text string
+	}{ref: ref, text: text})
+	return nil
+}
+func (f *fakeLiteEngine) Capabilities() []engine.Capability {
+	return []engine.Capability{engine.CapClick, engine.CapType}
+}
+func (f *fakeLiteEngine) Close() error { return nil }
 
 func (m *failMockBridge) TabContext(tabID string) (context.Context, string, error) {
 	return nil, "", fmt.Errorf("tab not found")
@@ -250,6 +300,94 @@ func TestHandleAction_GetMissingKind(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Errorf("expected 400 for missing kind, got %d", w.Code)
+	}
+}
+
+func TestHandleAction_LiteClickRoutesWithoutChrome(t *testing.T) {
+	b := &liteActionBridge{}
+	lite := &fakeLiteEngine{}
+	h := New(b, &config.RuntimeConfig{}, nil, nil, nil)
+	h.Router = engine.NewRouter(engine.ModeLite, lite)
+
+	req := httptest.NewRequest("POST", "/action", bytes.NewReader([]byte(`{"kind":"click","ref":"e1"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleAction(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("X-Engine"); got != "lite" {
+		t.Fatalf("expected X-Engine=lite, got %q", got)
+	}
+	if b.ensureChromeCalled {
+		t.Fatal("expected lite action to skip chrome initialization")
+	}
+	if len(lite.clickRefs) != 1 || lite.clickRefs[0] != "e1" {
+		t.Fatalf("expected click ref e1, got %+v", lite.clickRefs)
+	}
+}
+
+func TestHandleAction_LiteUnsupportedReturns501(t *testing.T) {
+	b := &liteActionBridge{}
+	h := New(b, &config.RuntimeConfig{}, nil, nil, nil)
+	h.Router = engine.NewRouter(engine.ModeLite, &fakeLiteEngine{})
+
+	req := httptest.NewRequest("POST", "/action", bytes.NewReader([]byte(`{"kind":"press","ref":"e1","key":"Enter"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleAction(w, req)
+
+	if w.Code != 501 {
+		t.Fatalf("expected 501, got %d: %s", w.Code, w.Body.String())
+	}
+	if b.ensureChromeCalled {
+		t.Fatal("expected unsupported lite action to avoid chrome initialization")
+	}
+}
+
+func TestHandleActions_LiteBatchSupportsClickAndType(t *testing.T) {
+	b := &liteActionBridge{}
+	lite := &fakeLiteEngine{}
+	h := New(b, &config.RuntimeConfig{}, nil, nil, nil)
+	h.Router = engine.NewRouter(engine.ModeLite, lite)
+
+	body := `{
+		"actions": [
+			{"kind":"click","ref":"e1"},
+			{"kind":"type","ref":"e2","text":"hello"}
+		]
+	}`
+	req := httptest.NewRequest("POST", "/actions", bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleActions(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if b.ensureChromeCalled {
+		t.Fatal("expected lite batch actions to skip chrome initialization")
+	}
+
+	resp := struct {
+		Successful int `json:"successful"`
+		Failed     int `json:"failed"`
+	}{}
+	if err := json.NewDecoder(bytes.NewReader(w.Body.Bytes())).Decode(&resp); err != nil && err != io.EOF {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Successful != 2 || resp.Failed != 0 {
+		t.Fatalf("expected 2 successful actions, got %+v", resp)
+	}
+	if len(lite.clickRefs) != 1 || lite.clickRefs[0] != "e1" {
+		t.Fatalf("unexpected click refs: %+v", lite.clickRefs)
+	}
+	if len(lite.typeCalls) != 1 || lite.typeCalls[0].ref != "e2" || lite.typeCalls[0].text != "hello" {
+		t.Fatalf("unexpected type calls: %+v", lite.typeCalls)
 	}
 }
 

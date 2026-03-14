@@ -63,7 +63,7 @@ func TestLiteEngine_Snapshot_All(t *testing.T) {
 		t.Fatalf("Navigate: %v", err)
 	}
 
-	nodes, err := lite.Snapshot(context.Background(), "")
+	nodes, err := lite.Snapshot(context.Background(), "", "all")
 	if err != nil {
 		t.Fatalf("Snapshot: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestLiteEngine_Snapshot_Interactive(t *testing.T) {
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
 
-	nodes, err := lite.Snapshot(context.Background(), "interactive")
+	nodes, err := lite.Snapshot(context.Background(), "", "interactive")
 	if err != nil {
 		t.Fatalf("Snapshot interactive: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestLiteEngine_Text(t *testing.T) {
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
 
-	text, err := lite.Text(context.Background())
+	text, err := lite.Text(context.Background(), "")
 	if err != nil {
 		t.Fatalf("Text: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestLiteEngine_Click(t *testing.T) {
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
 
-	nodes, _ := lite.Snapshot(context.Background(), "interactive")
+	nodes, _ := lite.Snapshot(context.Background(), "", "interactive")
 	var buttonRef string
 	for _, n := range nodes {
 		if n.Role == "button" {
@@ -150,7 +150,7 @@ func TestLiteEngine_Click(t *testing.T) {
 		t.Fatal("no button found in snapshot")
 	}
 
-	if err := lite.Click(context.Background(), buttonRef); err != nil {
+	if err := lite.Click(context.Background(), "", buttonRef); err != nil {
 		t.Errorf("Click: %v", err)
 	}
 }
@@ -164,7 +164,7 @@ func TestLiteEngine_Type(t *testing.T) {
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
 
-	nodes, _ := lite.Snapshot(context.Background(), "interactive")
+	nodes, _ := lite.Snapshot(context.Background(), "", "interactive")
 	var inputRef string
 	for _, n := range nodes {
 		if n.Role == "textbox" {
@@ -176,7 +176,7 @@ func TestLiteEngine_Type(t *testing.T) {
 		t.Fatal("no textbox found in snapshot")
 	}
 
-	if err := lite.Type(context.Background(), inputRef, "hello"); err != nil {
+	if err := lite.Type(context.Background(), "", inputRef, "hello"); err != nil {
 		t.Errorf("Type: %v", err)
 	}
 }
@@ -186,7 +186,7 @@ func TestLiteEngine_RefNotFound(t *testing.T) {
 	defer func() { _ = lite.Close() }()
 
 	// No page loaded
-	_, err := lite.Snapshot(context.Background(), "")
+	_, err := lite.Snapshot(context.Background(), "", "all")
 	if err == nil {
 		t.Error("expected error for snapshot without navigate")
 	}
@@ -196,9 +196,9 @@ func TestLiteEngine_RefNotFound(t *testing.T) {
 	defer ts.Close()
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
-	_, _ = lite.Snapshot(context.Background(), "")
+	_, _ = lite.Snapshot(context.Background(), "", "all")
 
-	if err := lite.Click(context.Background(), "nonexistent"); err == nil {
+	if err := lite.Click(context.Background(), "", "nonexistent"); err == nil {
 		t.Error("expected error for bad ref")
 	}
 }
@@ -219,7 +219,7 @@ func TestLiteEngine_ScriptStyleSkipped(t *testing.T) {
 	defer func() { _ = lite.Close() }()
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
-	nodes, _ := lite.Snapshot(context.Background(), "")
+	nodes, _ := lite.Snapshot(context.Background(), "", "all")
 
 	for _, n := range nodes {
 		if n.Tag == "script" || n.Tag == "style" {
@@ -243,7 +243,7 @@ func TestLiteEngine_AriaAttributes(t *testing.T) {
 	defer func() { _ = lite.Close() }()
 
 	_, _ = lite.Navigate(context.Background(), ts.URL)
-	nodes, _ := lite.Snapshot(context.Background(), "")
+	nodes, _ := lite.Snapshot(context.Background(), "", "all")
 
 	foundNav := false
 	foundBtn := false
@@ -283,9 +283,14 @@ func TestLiteEngine_MultiTab(t *testing.T) {
 	}
 
 	// Current tab is the most recent (page2)
-	text, _ := lite.Text(context.Background())
+	text, _ := lite.Text(context.Background(), "")
 	if !strings.Contains(text, "Second") {
 		t.Errorf("expected page 2 text, got: %s", text)
+	}
+
+	text, _ = lite.Text(context.Background(), res1.TabID)
+	if !strings.Contains(text, "First") {
+		t.Errorf("expected page 1 text via tab ID, got: %s", text)
 	}
 }
 
@@ -301,7 +306,7 @@ func TestLiteEngine_Close(t *testing.T) {
 	}
 
 	// After close, operations should fail
-	_, err := lite.Snapshot(context.Background(), "")
+	_, err := lite.Snapshot(context.Background(), "", "all")
 	if err == nil {
 		t.Error("expected error after close")
 	}

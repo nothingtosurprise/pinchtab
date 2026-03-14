@@ -135,13 +135,13 @@ func (l *LiteEngine) Navigate(ctx context.Context, url string) (*NavigateResult,
 }
 
 // Snapshot returns the DOM tree as snapshot nodes.
-func (l *LiteEngine) Snapshot(_ context.Context, filter string) ([]SnapshotNode, error) {
+func (l *LiteEngine) Snapshot(_ context.Context, tabID, filter string) ([]SnapshotNode, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	tab := l.tabs[l.current]
-	if tab == nil || tab.window == nil {
-		return nil, errors.New("no page loaded")
+	tab, err := l.resolveTab(tabID)
+	if err != nil {
+		return nil, err
 	}
 
 	doc := tab.window.Document()
@@ -160,13 +160,13 @@ func (l *LiteEngine) Snapshot(_ context.Context, filter string) ([]SnapshotNode,
 }
 
 // Text returns the visible text content of the page.
-func (l *LiteEngine) Text(_ context.Context) (string, error) {
+func (l *LiteEngine) Text(_ context.Context, tabID string) (string, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	tab := l.tabs[l.current]
-	if tab == nil || tab.window == nil {
-		return "", errors.New("no page loaded")
+	tab, err := l.resolveTab(tabID)
+	if err != nil {
+		return "", err
 	}
 
 	doc := tab.window.Document()
@@ -184,13 +184,13 @@ func (l *LiteEngine) Text(_ context.Context) (string, error) {
 }
 
 // Click clicks an element identified by ref.
-func (l *LiteEngine) Click(ctx context.Context, ref string) (retErr error) {
+func (l *LiteEngine) Click(ctx context.Context, tabID, ref string) (retErr error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	tab := l.tabs[l.current]
-	if tab == nil {
-		return errors.New("no page loaded")
+	tab, err := l.resolveTab(tabID)
+	if err != nil {
+		return err
 	}
 
 	el, ok := tab.refMap[ref]
@@ -214,13 +214,13 @@ func (l *LiteEngine) Click(ctx context.Context, ref string) (retErr error) {
 }
 
 // Type enters text into an element identified by ref.
-func (l *LiteEngine) Type(_ context.Context, ref, text string) error {
+func (l *LiteEngine) Type(_ context.Context, tabID, ref, text string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	tab := l.tabs[l.current]
-	if tab == nil {
-		return errors.New("no page loaded")
+	tab, err := l.resolveTab(tabID)
+	if err != nil {
+		return err
 	}
 
 	el, ok := tab.refMap[ref]
@@ -249,6 +249,21 @@ func (l *LiteEngine) Close() error {
 	}
 	l.tabs = make(map[string]*liteTab)
 	return nil
+}
+
+func (l *LiteEngine) resolveTab(tabID string) (*liteTab, error) {
+	if tabID == "" {
+		tabID = l.current
+	}
+	if tabID == "" {
+		return nil, errors.New("no page loaded")
+	}
+	tab := l.tabs[tabID]
+	if tab == nil || tab.window == nil {
+		return nil, fmt.Errorf("tab %q not found", tabID)
+	}
+	l.current = tabID
+	return tab, nil
 }
 
 // ---------- helpers ----------

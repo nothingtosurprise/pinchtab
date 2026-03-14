@@ -32,13 +32,7 @@ func RunBridgeServer(cfg *config.RuntimeConfig) {
 
 	mux := http.NewServeMux()
 	h := handlers.New(bridgeInstance, cfg, nil, nil, nil)
-
-	mode := engine.Mode(cfg.Engine)
-	if mode == engine.ModeLite || mode == engine.ModeAuto {
-		lite := engine.NewLiteEngine()
-		h.Router = engine.NewRouter(mode, lite)
-		slog.Info("engine router enabled", "mode", cfg.Engine, "rules", h.Router.Rules())
-	}
+	configureBridgeRouter(h, cfg)
 
 	shutdownOnce := &sync.Once{}
 	doShutdown := func() {
@@ -86,4 +80,15 @@ func RunBridgeServer(cfg *config.RuntimeConfig) {
 	if err := server.Shutdown(ctx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
+}
+
+func configureBridgeRouter(h *handlers.Handlers, cfg *config.RuntimeConfig) {
+	mode := engine.Mode(cfg.Engine)
+	if mode != engine.ModeLite && mode != engine.ModeAuto {
+		return
+	}
+
+	lite := engine.NewLiteEngine()
+	h.Router = engine.NewRouter(mode, lite)
+	slog.Info("engine router enabled", "mode", cfg.Engine, "rules", h.Router.Rules())
 }

@@ -388,7 +388,7 @@ func runRealworldSuite(t *testing.T, tc realworldTestCase) {
 
 func snapshotNodes(t *testing.T, lite *LiteEngine, filter string) []SnapshotNode {
 	t.Helper()
-	nodes, err := lite.Snapshot(context.Background(), filter)
+	nodes, err := lite.Snapshot(context.Background(), "", filter)
 	if err != nil {
 		t.Fatalf("Snapshot(%q): %v", filter, err)
 	}
@@ -397,7 +397,7 @@ func snapshotNodes(t *testing.T, lite *LiteEngine, filter string) []SnapshotNode
 
 func getText(t *testing.T, lite *LiteEngine) string {
 	t.Helper()
-	text, err := lite.Text(context.Background())
+	text, err := lite.Text(context.Background(), "")
 	if err != nil {
 		t.Fatalf("Text: %v", err)
 	}
@@ -676,7 +676,7 @@ func TestRealworld_FormHeavy(t *testing.T) {
 				if firstInput == "" {
 					t.Fatal("no textbox found")
 				}
-				err := lite.Type(context.Background(), firstInput, "TestUser")
+				err := lite.Type(context.Background(), "", firstInput, "TestUser")
 				if err != nil {
 					t.Errorf("Type: %v", err)
 				}
@@ -822,7 +822,7 @@ func TestRealworld_EmptyPage(t *testing.T) {
 		t.Fatalf("Navigate: %v", err)
 	}
 
-	nodes, err := lite.Snapshot(context.Background(), "")
+	nodes, err := lite.Snapshot(context.Background(), "", "all")
 	if err != nil {
 		t.Fatalf("Snapshot: %v", err)
 	}
@@ -831,7 +831,7 @@ func TestRealworld_EmptyPage(t *testing.T) {
 		t.Errorf("expected <= 1 nodes for empty page, got %d", len(nodes))
 	}
 
-	text, err := lite.Text(context.Background())
+	text, err := lite.Text(context.Background(), "")
 	if err != nil {
 		t.Fatalf("Text: %v", err)
 	}
@@ -1017,14 +1017,14 @@ func TestRealworld_ClickWorkflow(t *testing.T) {
 
 	// Click every interactive element — should not error or panic
 	for _, n := range nodes {
-		err := lite.Click(context.Background(), n.Ref)
+		err := lite.Click(context.Background(), "", n.Ref)
 		if err != nil {
 			t.Errorf("Click(%s role=%s name=%q): %v", n.Ref, n.Role, n.Name, err)
 		}
 	}
 
 	// Engine should still be usable
-	text, err := lite.Text(context.Background())
+	text, err := lite.Text(context.Background(), "")
 	if err != nil {
 		t.Fatalf("Text after clicks: %v", err)
 	}
@@ -1057,7 +1057,7 @@ func TestRealworld_ClickLinkRecovery(t *testing.T) {
 
 	for _, n := range nodes {
 		if n.Role == "link" {
-			err := lite.Click(context.Background(), n.Ref)
+			err := lite.Click(context.Background(), "", n.Ref)
 			// Error is acceptable (recovered panic) — the key is it doesn't crash
 			_ = err
 		}
@@ -1080,7 +1080,7 @@ func TestRealworld_TypeWorkflow(t *testing.T) {
 	// Type into all textboxes
 	for _, n := range nodes {
 		if n.Role == "textbox" {
-			err := lite.Type(context.Background(), n.Ref, "test-value")
+			err := lite.Type(context.Background(), "", n.Ref, "test-value")
 			if err != nil {
 				t.Errorf("Type(%s name=%q): %v", n.Ref, n.Name, err)
 			}

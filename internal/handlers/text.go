@@ -19,8 +19,9 @@ import (
 // @Endpoint GET /text
 func (h *Handlers) HandleText(w http.ResponseWriter, r *http.Request) {
 	// --- Lite engine fast path ---
+	tabID := r.URL.Query().Get("tabId")
 	if h.useLite(engine.CapText, "") {
-		text, err := h.Router.Lite().Text(r.Context())
+		text, err := h.Router.Lite().Text(r.Context(), tabID)
 		if err != nil {
 			web.Error(w, 500, fmt.Errorf("lite text: %w", err))
 			return
@@ -37,7 +38,6 @@ func (h *Handlers) HandleText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tabID := r.URL.Query().Get("tabId")
 	mode := r.URL.Query().Get("mode")
 	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
 	maxChars := -1

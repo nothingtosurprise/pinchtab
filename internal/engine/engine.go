@@ -63,10 +63,10 @@ type SnapshotNode struct {
 type Engine interface {
 	Name() string
 	Navigate(ctx context.Context, url string) (*NavigateResult, error)
-	Snapshot(ctx context.Context, filter string) ([]SnapshotNode, error)
-	Text(ctx context.Context) (string, error)
-	Click(ctx context.Context, ref string) error
-	Type(ctx context.Context, ref, text string) error
+	Snapshot(ctx context.Context, tabID, filter string) ([]SnapshotNode, error)
+	Text(ctx context.Context, tabID string) (string, error)
+	Click(ctx context.Context, tabID, ref string) error
+	Type(ctx context.Context, tabID, ref, text string) error
 	Capabilities() []Capability
 	Close() error
 }

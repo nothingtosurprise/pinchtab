@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pinchtab/pinchtab/internal/bridge"
+	"github.com/pinchtab/pinchtab/internal/engine"
 	"github.com/pinchtab/pinchtab/internal/semantic"
 	"github.com/pinchtab/pinchtab/internal/web"
 )
@@ -45,12 +47,6 @@ func (h *Handlers) enforceTabLease(tabID, owner string) error {
 
 // HandleAction performs a single action on a tab (click, type, fill, etc).
 func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
-	// Ensure Chrome is initialized
-	if err := h.ensureChrome(); err != nil {
-		web.Error(w, 500, fmt.Errorf("chrome initialization: %w", err))
-		return
-	}
-
 	var req bridge.ActionRequest
 	if r.Method == http.MethodGet {
 		q := r.URL.Query()
@@ -79,17 +75,19 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 		web.Error(w, 400, fmt.Errorf("missing required field 'kind'"))
 		return
 	}
-	if available := h.Bridge.AvailableActions(); len(available) > 0 {
-		known := false
-		for _, k := range available {
-			if k == req.Kind {
-				known = true
-				break
+	if !h.shouldUseLiteAction(req.Kind) {
+		if available := h.Bridge.AvailableActions(); len(available) > 0 {
+			known := false
+			for _, k := range available {
+				if k == req.Kind {
+					known = true
+					break
+				}
 			}
-		}
-		if !known {
-			web.Error(w, 400, fmt.Errorf("unknown action kind: %s", req.Kind))
-			return
+			if !known {
+				web.Error(w, 400, fmt.Errorf("unknown action kind: %s", req.Kind))
+				return
+			}
 		}
 	}
 
@@ -124,9 +122,11 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 	defer tCancel()
 	go web.CancelOnClientDone(r.Context(), tCancel)
 
+	useLiteAction := h.shouldUseLiteAction(req.Kind)
+
 	// Resolve ref → nodeID
 	refMissing := false
-	if req.Ref != "" && req.NodeID == 0 && req.Selector == "" {
+	if !useLiteAction && req.Ref != "" && req.NodeID == 0 && req.Selector == "" {
 		cache := h.Bridge.GetRefCache(resolvedTabID)
 		if cache != nil {
 			if nid, ok := cache.Refs[req.Ref]; ok {
@@ -141,7 +141,7 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 	// Cache intent before execution so recovery can reconstruct the query.
 	// Only cache when the ref IS in the snapshot — otherwise we'd overwrite
 	// the richer /find-cached entry (which has the Query) with a blank one.
-	if req.Ref != "" && h.Recovery != nil && !refMissing {
+	if !useLiteAction && req.Ref != "" && h.Recovery != nil && !refMissing {
 		h.cacheActionIntent(resolvedTabID, req)
 	}
 
@@ -149,6 +149,7 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 	// returning 404. This handles the common case where a page reload
 	// cleared the snapshot (DeleteRefCache) but the intent is still cached.
 	var result map[string]any
+	var engineName string
 	var actionErr error
 	var recoveryResult *semantic.RecoveryResult
 
@@ -157,7 +158,8 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 			tCtx, resolvedTabID, req.Ref, req.Kind,
 			func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 				req.NodeID = nodeID
-				return h.Bridge.ExecuteAction(ctx, kind, req)
+				res, _, err := h.executeAction(ctx, req)
+				return res, err
 			},
 		)
 		recoveryResult = &rr
@@ -170,14 +172,14 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 		web.Error(w, 404, fmt.Errorf("ref %s not found - take a /snapshot first", req.Ref))
 		return
 	} else {
-		result, actionErr = h.Bridge.ExecuteAction(tCtx, req.Kind, req)
+		result, engineName, actionErr = h.executeAction(tCtx, req)
 		if actionErr != nil && req.Ref != "" && shouldRetryStaleRef(actionErr) {
 			recordStaleRefRetry()
 			h.refreshRefCache(tCtx, resolvedTabID)
 			if cache := h.Bridge.GetRefCache(resolvedTabID); cache != nil {
 				if nid, ok := cache.Refs[req.Ref]; ok {
 					req.NodeID = nid
-					result, actionErr = h.Bridge.ExecuteAction(tCtx, req.Kind, req)
+					result, engineName, actionErr = h.executeAction(tCtx, req)
 				}
 			}
 		}
@@ -189,7 +191,8 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 				semantic.ClassifyFailure(actionErr),
 				func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 					req.NodeID = nodeID
-					return h.Bridge.ExecuteAction(ctx, kind, req)
+					res, _, err := h.executeAction(ctx, req)
+					return res, err
 				},
 			)
 			recoveryResult = &rr
@@ -207,10 +210,17 @@ func (h *Handlers) HandleAction(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		if errors.Is(actionErr, engine.ErrLiteNotSupported) {
+			web.ErrorCode(w, http.StatusNotImplemented, "not_supported", actionErr.Error(), false, nil)
+			return
+		}
 		web.ErrorCode(w, 500, "action_failed", fmt.Sprintf("action %s: %v", req.Kind, actionErr), true, nil)
 		return
 	}
 
+	if engineName == "lite" {
+		w.Header().Set("X-Engine", "lite")
+	}
 	resp := map[string]any{"success": true, "result": result}
 	if recoveryResult != nil {
 		resp["recovery"] = recoveryResult
@@ -268,12 +278,6 @@ type actionResult struct {
 }
 
 func (h *Handlers) HandleActions(w http.ResponseWriter, r *http.Request) {
-	// Ensure Chrome is initialized
-	if err := h.ensureChrome(); err != nil {
-		web.Error(w, 500, fmt.Errorf("chrome initialization: %w", err))
-		return
-	}
-
 	var req actionsRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize)).Decode(&req); err != nil {
 		web.Error(w, 400, fmt.Errorf("decode: %w", err))
@@ -364,8 +368,9 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 		}
 
 		tCtx, tCancel := context.WithTimeout(ctx, h.Config.ActionTimeout)
+		useLiteAction := h.shouldUseLiteAction(action.Kind)
 
-		if action.Ref != "" && action.NodeID == 0 && action.Selector == "" {
+		if !useLiteAction && action.Ref != "" && action.NodeID == 0 && action.Selector == "" {
 			cache := h.Bridge.GetRefCache(resolvedTabID)
 			if cache != nil {
 				if nid, ok := cache.Refs[action.Ref]; ok {
@@ -374,7 +379,7 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 			}
 		}
 
-		refMissing := action.Ref != "" && action.NodeID == 0 && action.Selector == ""
+		refMissing := !useLiteAction && action.Ref != "" && action.NodeID == 0 && action.Selector == ""
 
 		if action.Kind == "" {
 			tCancel()
@@ -390,7 +395,7 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 		// Cache intent before execution so recovery can reconstruct the query.
 		// Only cache when the ref IS in the snapshot to avoid overwriting
 		// the richer /find-cached entry (which has the Query).
-		if action.Ref != "" && h.Recovery != nil && !refMissing {
+		if !useLiteAction && action.Ref != "" && h.Recovery != nil && !refMissing {
 			h.cacheActionIntent(resolvedTabID, action)
 		}
 
@@ -404,7 +409,8 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 				tCtx, resolvedTabID, action.Ref, action.Kind,
 				func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 					action.NodeID = nodeID
-					return h.Bridge.ExecuteAction(ctx, kind, action)
+					res, _, err := h.executeAction(ctx, action)
+					return res, err
 				},
 			)
 			_ = rr
@@ -424,14 +430,14 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 			}
 			continue
 		} else {
-			actionRes, err = h.Bridge.ExecuteAction(tCtx, action.Kind, action)
+			actionRes, _, err = h.executeAction(tCtx, action)
 			if err != nil && action.Ref != "" && shouldRetryStaleRef(err) {
 				recordStaleRefRetry()
 				h.refreshRefCache(tCtx, resolvedTabID)
 				if cache := h.Bridge.GetRefCache(resolvedTabID); cache != nil {
 					if nid, ok := cache.Refs[action.Ref]; ok {
 						action.NodeID = nid
-						actionRes, err = h.Bridge.ExecuteAction(tCtx, action.Kind, action)
+						actionRes, _, err = h.executeAction(tCtx, action)
 					}
 				}
 			}
@@ -442,7 +448,8 @@ func (h *Handlers) handleActionsBatch(w http.ResponseWriter, r *http.Request, re
 					semantic.ClassifyFailure(err),
 					func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 						action.NodeID = nodeID
-						return h.Bridge.ExecuteAction(ctx, kind, action)
+						res, _, err := h.executeAction(ctx, action)
+						return res, err
 					},
 				)
 				_ = rr // recovery metadata not surfaced per-action in batch
@@ -524,9 +531,10 @@ func (h *Handlers) HandleMacro(w http.ResponseWriter, r *http.Request) {
 		if step.TabID == "" {
 			step.TabID = resolvedTabID
 		}
+		useLiteAction := h.shouldUseLiteAction(step.Kind)
 		// Resolve ref → nodeID from snapshot cache (mirrors HandleAction).
 		stepRefMissing := false
-		if step.Ref != "" && step.NodeID == 0 && step.Selector == "" {
+		if !useLiteAction && step.Ref != "" && step.NodeID == 0 && step.Selector == "" {
 			cache := h.Bridge.GetRefCache(resolvedTabID)
 			if cache != nil {
 				if nid, ok := cache.Refs[step.Ref]; ok {
@@ -541,7 +549,7 @@ func (h *Handlers) HandleMacro(w http.ResponseWriter, r *http.Request) {
 		// Cache intent before execution so recovery can reconstruct the query.
 		// Only cache when the ref IS in the snapshot to avoid overwriting
 		// the richer /find-cached entry (which has the Query).
-		if step.Ref != "" && h.Recovery != nil && !stepRefMissing {
+		if !useLiteAction && step.Ref != "" && h.Recovery != nil && !stepRefMissing {
 			h.cacheActionIntent(resolvedTabID, step)
 		}
 
@@ -556,7 +564,8 @@ func (h *Handlers) HandleMacro(w http.ResponseWriter, r *http.Request) {
 				tCtx, resolvedTabID, step.Ref, step.Kind,
 				func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 					step.NodeID = nodeID
-					return h.Bridge.ExecuteAction(ctx, kind, step)
+					res, _, err := h.executeAction(ctx, step)
+					return res, err
 				},
 			)
 			_ = rr
@@ -576,14 +585,14 @@ func (h *Handlers) HandleMacro(w http.ResponseWriter, r *http.Request) {
 			}
 			continue
 		} else {
-			res, err = h.Bridge.ExecuteAction(tCtx, step.Kind, step)
+			res, _, err = h.executeAction(tCtx, step)
 			if err != nil && step.Ref != "" && shouldRetryStaleRef(err) {
 				recordStaleRefRetry()
 				h.refreshRefCache(tCtx, resolvedTabID)
 				if cache := h.Bridge.GetRefCache(resolvedTabID); cache != nil {
 					if nid, ok := cache.Refs[step.Ref]; ok {
 						step.NodeID = nid
-						res, err = h.Bridge.ExecuteAction(tCtx, step.Kind, step)
+						res, _, err = h.executeAction(tCtx, step)
 					}
 				}
 			}
@@ -594,7 +603,8 @@ func (h *Handlers) HandleMacro(w http.ResponseWriter, r *http.Request) {
 					semantic.ClassifyFailure(err),
 					func(ctx context.Context, kind string, nodeID int64) (map[string]any, error) {
 						step.NodeID = nodeID
-						return h.Bridge.ExecuteAction(ctx, kind, step)
+						res, _, err := h.executeAction(ctx, step)
+						return res, err
 					},
 				)
 				_ = rr
@@ -662,6 +672,70 @@ func (h *Handlers) cacheActionIntent(tabID string, req bridge.ActionRequest) {
 		Descriptor: desc,
 		CachedAt:   time.Now(),
 	})
+}
+
+func (h *Handlers) executeAction(ctx context.Context, req bridge.ActionRequest) (map[string]any, string, error) {
+	if h.shouldUseLiteAction(req.Kind) {
+		return h.executeLiteAction(ctx, req)
+	}
+
+	if err := h.ensureChrome(); err != nil {
+		return nil, "", fmt.Errorf("chrome initialization: %w", err)
+	}
+	result, err := h.Bridge.ExecuteAction(ctx, req.Kind, req)
+	return result, "", err
+}
+
+func (h *Handlers) shouldUseLiteAction(kind string) bool {
+	capability, ok := actionCapability(kind)
+	if !ok {
+		return h.Router != nil && h.Router.Mode() == engine.ModeLite
+	}
+	return h.useLite(capability, "")
+}
+
+func (h *Handlers) executeLiteAction(ctx context.Context, req bridge.ActionRequest) (map[string]any, string, error) {
+	if h.Router == nil || h.Router.Lite() == nil {
+		return nil, "", fmt.Errorf("lite engine unavailable")
+	}
+	switch strings.ToLower(strings.TrimSpace(req.Kind)) {
+	case bridge.ActionClick:
+		if req.Ref == "" {
+			return nil, "lite", fmt.Errorf("lite mode actions require ref from /snapshot")
+		}
+		if err := h.Router.Lite().Click(ctx, req.TabID, req.Ref); err != nil {
+			return nil, "lite", err
+		}
+		return map[string]any{"clicked": true}, "lite", nil
+	case bridge.ActionType, bridge.ActionFill:
+		if req.Ref == "" {
+			return nil, "lite", fmt.Errorf("lite mode actions require ref from /snapshot")
+		}
+		text := req.Text
+		if req.Kind == bridge.ActionFill && text == "" {
+			text = req.Value
+		}
+		if text == "" {
+			return nil, "lite", fmt.Errorf("text required for %s", req.Kind)
+		}
+		if err := h.Router.Lite().Type(ctx, req.TabID, req.Ref, text); err != nil {
+			return nil, "lite", err
+		}
+		return map[string]any{"typed": text}, "lite", nil
+	default:
+		return nil, "lite", fmt.Errorf("%w: %s", engine.ErrLiteNotSupported, req.Kind)
+	}
+}
+
+func actionCapability(kind string) (engine.Capability, bool) {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case bridge.ActionClick:
+		return engine.CapClick, true
+	case bridge.ActionType, bridge.ActionFill:
+		return engine.CapType, true
+	default:
+		return "", false
+	}
 }
 
 func shouldRetryStaleRef(err error) bool {
