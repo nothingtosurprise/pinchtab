@@ -271,6 +271,25 @@ Console and error routes use query parameters:
 - `tabId`
 - `limit`
 
+## Challenge Solvers
+
+```text
+GET  /solvers
+POST /solve
+POST /solve/{name}
+POST /tabs/{id}/solve
+POST /tabs/{id}/solve/{name}
+```
+
+The solver framework auto-detects and resolves browser challenges (Cloudflare Turnstile, etc.). See [Solve reference](./reference/solve.md) for details.
+
+Solve body fields:
+
+- `solver` optional solver name (auto-detect when omitted)
+- `tabId` optional
+- `maxAttempts` optional (default: 3)
+- `timeout` optional in ms (default: 30000)
+
 ## Profiles And Instances
 
 ```text

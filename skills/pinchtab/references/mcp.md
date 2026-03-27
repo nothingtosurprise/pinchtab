@@ -132,6 +132,7 @@ The MCP surface is intentionally scoped to browser automation. The following are
 |------------|--------|-------------|
 | Create/edit/delete profiles | ❌ Not available | Use `pinchtab profile` CLI or HTTP API |
 | Configure the scheduler | ❌ Not available | Use `pinchtab schedule` CLI |
+| Solve challenges (Cloudflare, etc.) | ❌ Not available | Use `POST /solve` HTTP API |
 | Modify stealth / fingerprint settings | ❌ Not available | Edit config file directly |
 | Start or stop the PinchTab server | ❌ Not available | Use `pinchtab start` / `pinchtab stop` CLI |
 | Manage fleet instances | ❌ Not available | Use `pinchtab instances` CLI |

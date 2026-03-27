@@ -23,6 +23,7 @@ Note: this index is generated and should be checked against the code when comman
 - [Scroll](./scroll.md)
 - [Select](./select.md)
 - [Snapshot](./snapshot.md)
+- [Solve](./solve.md)
 - [Strategies](./strategies.md)
 - [Tabs](./tabs.md)
 - [Text](./text.md)
