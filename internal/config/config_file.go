@@ -112,6 +112,7 @@ func DefaultFileConfig() FileConfig {
 				Enabled:        &activityEnabled,
 				SessionIdleSec: &activitySessionIdleSec,
 				RetentionDays:  &activityRetentionDays,
+				StateDir:       "",
 			},
 		},
 		Sessions: SessionsFileConfig{
@@ -255,9 +256,10 @@ type observabilityFileConfigJSON struct {
 }
 
 type activityConfigJSON struct {
-	Enabled        *bool `json:"enabled"`
-	SessionIdleSec *int  `json:"sessionIdleSec"`
-	RetentionDays  *int  `json:"retentionDays"`
+	Enabled        *bool  `json:"enabled"`
+	SessionIdleSec *int   `json:"sessionIdleSec"`
+	RetentionDays  *int   `json:"retentionDays"`
+	StateDir       string `json:"stateDir"`
 }
 
 type sessionsFileConfigJSON struct {
@@ -399,6 +401,7 @@ func (fc FileConfig) MarshalJSON() ([]byte, error) {
 				Enabled:        fc.Observability.Activity.Enabled,
 				SessionIdleSec: fc.Observability.Activity.SessionIdleSec,
 				RetentionDays:  fc.Observability.Activity.RetentionDays,
+				StateDir:       fc.Observability.Activity.StateDir,
 			},
 		},
 		Sessions: sessionsFileConfigJSON{
@@ -462,6 +465,7 @@ func FileConfigFromRuntime(cfg *RuntimeConfig) FileConfig {
 	activityEnabled := cfg.Observability.Activity.Enabled
 	activitySessionIdleSec := cfg.Observability.Activity.SessionIdleSec
 	activityRetentionDays := cfg.Observability.Activity.RetentionDays
+	activityStateDir := cfg.Observability.Activity.StateDir
 	dashboardSessionPersist := cfg.Sessions.Dashboard.Persist
 	dashboardSessionIdleSec := int(cfg.Sessions.Dashboard.IdleTimeout / time.Second)
 	dashboardSessionMaxLifetimeSec := int(cfg.Sessions.Dashboard.MaxLifetime / time.Second)
@@ -561,6 +565,7 @@ func FileConfigFromRuntime(cfg *RuntimeConfig) FileConfig {
 				Enabled:        &activityEnabled,
 				SessionIdleSec: &activitySessionIdleSec,
 				RetentionDays:  &activityRetentionDays,
+				StateDir:       activityStateDir,
 			},
 		},
 		Sessions: SessionsFileConfig{

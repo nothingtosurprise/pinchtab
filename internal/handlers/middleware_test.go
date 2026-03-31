@@ -835,6 +835,32 @@ func TestRateLimitMiddleware_RateLimitsHealthAndMetrics(t *testing.T) {
 	}
 }
 
+func TestRateLimitMiddleware_DoesNotRateLimitStreamingEndpoints(t *testing.T) {
+	resetRateLimitStateForTests()
+	t.Cleanup(resetRateLimitStateForTests)
+
+	handler := RateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, p := range []string{
+		"/api/events",
+		"/api/agents/agent-1/events",
+		"/instances/inst-1/logs/stream",
+	} {
+		resetRateLimitStateForTests()
+		for i := 0; i < rateLimitMaxReq+5; i++ {
+			req := httptest.NewRequest(http.MethodGet, p, nil)
+			req.RemoteAddr = "127.0.0.1:12345"
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("%s request %d: expected 200, got %d", p, i+1, w.Code)
+			}
+		}
+	}
+}
+
 func TestRateLimitMiddleware_IgnoresSpoofedForwardedHeaders(t *testing.T) {
 	resetRateLimitStateForTests()
 	t.Cleanup(resetRateLimitStateForTests)

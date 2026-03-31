@@ -25,3 +25,15 @@ func (cfg *RuntimeConfig) EnabledSensitiveEndpoints() []string {
 	}
 	return enabled
 }
+
+// ActivityStateDir returns the directory root used for activity log storage.
+// When unset, activity logs live under the main server state directory.
+func (cfg *RuntimeConfig) ActivityStateDir() string {
+	if cfg == nil {
+		return ""
+	}
+	if cfg.Observability.Activity.StateDir != "" {
+		return cfg.Observability.Activity.StateDir
+	}
+	return cfg.StateDir
+}

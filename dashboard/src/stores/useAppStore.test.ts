@@ -16,6 +16,7 @@ describe("useAppStore", () => {
       currentMemory: {},
       agents: [],
       selectedAgentId: null,
+      agentEventsById: {},
       events: [],
       eventFilter: "all",
       settings: {
@@ -169,6 +170,58 @@ describe("useAppStore", () => {
       agents = useAppStore.getState().agents;
       expect(agents[0].requestCount).toBe(2);
       expect(agents[0].lastActivity).toBe("2024-01-01T00:01:00Z");
+    });
+
+    it("ignores live events without an agent id", () => {
+      useAppStore.getState().upsertAgentFromEvent({
+        id: "evt_1",
+        agentId: "",
+        channel: "progress",
+        type: "progress",
+        method: "",
+        path: "",
+        timestamp: "2024-01-01T00:00:00Z",
+      } as any);
+
+      expect(useAppStore.getState().agents).toEqual([]);
+    });
+
+    it("hydrates agent history without dropping already streamed events", () => {
+      useAppStore.getState().appendAgentEvent({
+        id: "evt_live",
+        agentId: "agent_1",
+        channel: "progress",
+        type: "progress",
+        method: "POST",
+        path: "/api/agents/agent_1/events",
+        timestamp: "2024-01-01T00:02:00Z",
+      } as any);
+
+      useAppStore.getState().hydrateAgentEvents("agent_1", [
+        {
+          id: "evt_old",
+          agentId: "agent_1",
+          channel: "tool_call",
+          type: "navigate",
+          method: "POST",
+          path: "/navigate",
+          timestamp: "2024-01-01T00:01:00Z",
+        } as any,
+        {
+          id: "evt_live",
+          agentId: "agent_1",
+          channel: "progress",
+          type: "progress",
+          method: "POST",
+          path: "/api/agents/agent_1/events",
+          timestamp: "2024-01-01T00:02:00Z",
+        } as any,
+      ]);
+
+      expect(useAppStore.getState().agentEventsById.agent_1).toEqual([
+        expect.objectContaining({ id: "evt_old" }),
+        expect.objectContaining({ id: "evt_live" }),
+      ]);
     });
   });
 

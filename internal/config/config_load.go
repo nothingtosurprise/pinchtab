@@ -93,6 +93,7 @@ func Load() *RuntimeConfig {
 				Enabled:        true,
 				SessionIdleSec: 1800,
 				RetentionDays:  1,
+				StateDir:       "",
 			},
 		},
 
@@ -260,6 +261,9 @@ func applyFileConfig(cfg *RuntimeConfig, fc *FileConfig) {
 	}
 	if fc.Observability.Activity.RetentionDays != nil {
 		cfg.Observability.Activity.RetentionDays = *fc.Observability.Activity.RetentionDays
+	}
+	if fc.Observability.Activity.StateDir != "" {
+		cfg.Observability.Activity.StateDir = fc.Observability.Activity.StateDir
 	}
 	if fc.Sessions.Dashboard.Persist != nil {
 		cfg.Sessions.Dashboard.Persist = *fc.Sessions.Dashboard.Persist

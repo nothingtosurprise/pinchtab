@@ -375,6 +375,11 @@ const (
 func RateLimitMiddleware(next http.Handler) http.Handler {
 	startRateLimiterJanitor(rateLimitWindow, evictionInterval)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isLongLivedStreamRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		host := authn.ClientIP(r)
 
 		now := time.Now()
@@ -398,6 +403,23 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isLongLivedStreamRequest(r *http.Request) bool {
+	if r == nil || r.Method != http.MethodGet {
+		return false
+	}
+	path := strings.TrimSpace(r.URL.Path)
+	switch {
+	case path == "/api/events":
+		return true
+	case strings.HasPrefix(path, "/api/agents/") && strings.HasSuffix(path, "/events"):
+		return true
+	case strings.HasPrefix(path, "/instances/") && strings.HasSuffix(path, "/logs/stream"):
+		return true
+	default:
+		return false
+	}
 }
 
 func startRateLimiterJanitor(window, interval time.Duration) {

@@ -58,8 +58,11 @@ interface AppState {
   // Agents
   agents: Agent[];
   selectedAgentId: string | null;
+  agentEventsById: Record<string, ActivityEvent[]>;
   setAgents: (agents: Agent[]) => void;
   upsertAgentFromEvent: (event: ActivityEvent) => void;
+  hydrateAgentEvents: (agentId: string, events: ActivityEvent[]) => void;
+  appendAgentEvent: (event: ActivityEvent) => void;
   setSelectedAgentId: (id: string | null) => void;
 
   // Activity feed
@@ -196,10 +199,14 @@ export const useAppStore = create<AppState>((set) => ({
   // Agents
   agents: [],
   selectedAgentId: null,
+  agentEventsById: {},
   setAgents: (agents) => set({ agents }),
   upsertAgentFromEvent: (event) =>
     set((state) => {
-      const agentId = event.agentId || "anonymous";
+      const agentId = event.agentId?.trim();
+      if (!agentId) {
+        return state;
+      }
       const existing = state.agents.find((agent) => agent.id === agentId);
 
       if (!existing) {
@@ -233,6 +240,50 @@ export const useAppStore = create<AppState>((set) => ({
               new Date(b.lastActivity || b.connectedAt).getTime() -
               new Date(a.lastActivity || a.connectedAt).getTime(),
           ),
+      };
+    }),
+  hydrateAgentEvents: (agentId, events) =>
+    set((state) => ({
+      agentEventsById: {
+        ...state.agentEventsById,
+        [agentId]: [...(state.agentEventsById[agentId] ?? []), ...events]
+          .reduce<ActivityEvent[]>((merged, event) => {
+            if (merged.some((existing) => existing.id === event.id)) {
+              return merged;
+            }
+            merged.push(event);
+            return merged;
+          }, [])
+          .sort(
+            (left, right) =>
+              new Date(left.timestamp).getTime() -
+              new Date(right.timestamp).getTime(),
+          )
+          .slice(-500),
+      },
+    })),
+  appendAgentEvent: (event) =>
+    set((state) => {
+      const agentId = event.agentId?.trim();
+      if (!agentId) {
+        return state;
+      }
+      const current = state.agentEventsById[agentId] ?? [];
+      if (current.some((existing) => existing.id === event.id)) {
+        return state;
+      }
+      const next = [...current, event]
+        .sort(
+          (left, right) =>
+            new Date(left.timestamp).getTime() -
+            new Date(right.timestamp).getTime(),
+        )
+        .slice(-500);
+      return {
+        agentEventsById: {
+          ...state.agentEventsById,
+          [agentId]: next,
+        },
       };
     }),
   setSelectedAgentId: (selectedAgentId) => set({ selectedAgentId }),

@@ -62,9 +62,14 @@ type Dashboard struct {
 	agents       map[string]*apiTypes.Agent
 	recentEvents []apiTypes.ActivityEvent
 	maxEvents    int
+	seenEventIDs map[string]struct{}
+	seenEventLog []string
+	maxSeenIDs   int
 
 	mu sync.RWMutex
 }
+
+const persistedAgentBootstrapLimit = 1000
 
 // BroadcastSystemEvent sends a system event to all SSE clients.
 func (d *Dashboard) BroadcastSystemEvent(evt SystemEvent) {
@@ -127,6 +132,9 @@ func (d *Dashboard) RecordActivityEvent(evt activity.Event) {
 	if evt.Engine != "" {
 		details["engine"] = evt.Engine
 	}
+	if evt.Action != "" {
+		details["action"] = evt.Action
+	}
 
 	d.RecordEvent(apiTypes.ActivityEvent{
 		ID:        evt.RequestID,
@@ -156,6 +164,11 @@ func (d *Dashboard) RecordEvent(evt apiTypes.ActivityEvent) {
 	}
 
 	d.mu.Lock()
+	if _, ok := d.seenEventIDs[evt.ID]; ok {
+		d.mu.Unlock()
+		return
+	}
+	d.rememberEventIDLocked(evt.ID)
 	d.upsertAgentLocked(evt)
 	if len(d.recentEvents) >= d.maxEvents {
 		copy(d.recentEvents, d.recentEvents[1:])
@@ -251,6 +264,45 @@ func (d *Dashboard) EventsForAgent(agentID, mode string) []apiTypes.ActivityEven
 	return out
 }
 
+// IngestPersistedAgentActivity loads new agent-tagged requests from the shared
+// activity store into the live dashboard cache.
+func (d *Dashboard) IngestPersistedAgentActivity(rec activity.Recorder, since time.Time) (time.Time, error) {
+	if d == nil || rec == nil || !rec.Enabled() {
+		return since, nil
+	}
+
+	events, err := rec.Query(activity.Filter{
+		Since: since,
+		Limit: persistedAgentBootstrapLimit,
+	})
+	if err != nil {
+		return since, err
+	}
+
+	latest := since
+	for _, evt := range events {
+		if evt.Timestamp.After(latest) {
+			latest = evt.Timestamp
+		}
+		if strings.TrimSpace(evt.AgentID) == "" {
+			continue
+		}
+		if !shouldTrackPersistedAgentActivity(evt) {
+			continue
+		}
+		d.RecordActivityEvent(evt)
+	}
+
+	return latest, nil
+}
+
+// LoadPersistedAgentActivity rebuilds the in-memory agent summaries and recent
+// tool-call history from the persisted activity log on server startup.
+func (d *Dashboard) LoadPersistedAgentActivity(rec activity.Recorder) error {
+	_, err := d.IngestPersistedAgentActivity(rec, time.Time{})
+	return err
+}
+
 func NewDashboard(cfg *DashboardConfig) *Dashboard {
 	c := DashboardConfig{
 		IdleTimeout:       30 * time.Second,
@@ -283,6 +335,9 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 		agents:         make(map[string]*apiTypes.Agent),
 		recentEvents:   make([]apiTypes.ActivityEvent, 0, 200),
 		maxEvents:      200,
+		seenEventIDs:   make(map[string]struct{}),
+		seenEventLog:   make([]string, 0, 2000),
+		maxSeenIDs:     2000,
 	}
 }
 
@@ -520,6 +575,24 @@ func matchesMode(mode, channel string) bool {
 	default:
 		return channel == "tool_call"
 	}
+}
+
+func shouldTrackPersistedAgentActivity(evt activity.Event) bool {
+	return strings.TrimSpace(evt.AgentID) != ""
+}
+
+func (d *Dashboard) rememberEventIDLocked(id string) {
+	if id == "" {
+		return
+	}
+	d.seenEventIDs[id] = struct{}{}
+	d.seenEventLog = append(d.seenEventLog, id)
+	if len(d.seenEventLog) <= d.maxSeenIDs {
+		return
+	}
+	evicted := d.seenEventLog[0]
+	d.seenEventLog = d.seenEventLog[1:]
+	delete(d.seenEventIDs, evicted)
 }
 
 func classifyActivityType(evt activity.Event) string {
