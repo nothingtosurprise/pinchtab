@@ -21,8 +21,10 @@ Notes:
 
 - use `fill` when you want to set the value more directly
 - the top-level CLI accepts unified selector forms such as `e8`, `#name`, `xpath://input`, or `text:Name`
+- for typing without a target element (into whatever is focused), use `keyboard type`
 
 ## Related Pages
 
-- [Fill](./fill.md)
+- [Fill](./fill.md) — Set input value directly
+- [Keyboard](./keyboard.md) — Low-level keyboard input (type at focused element)
 - [Snapshot](./snapshot.md)
