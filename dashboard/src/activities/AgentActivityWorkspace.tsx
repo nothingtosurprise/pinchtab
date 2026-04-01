@@ -164,6 +164,7 @@ export default function AgentActivityWorkspace({
   const [tabs, setTabs] = useState<InstanceTab[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
+  const [agentSessions, setAgentSessions] = useState<api.AgentSession[]>([]);
   const [error, setError] = useState("");
   const [refreshNonce, setRefreshNonce] = useState(0);
 
@@ -185,6 +186,19 @@ export default function AgentActivityWorkspace({
       sameActivityFilters(current, next) ? current : next,
     );
   }, [initialBaseFilters]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .fetchAgentSessions()
+      .then((sessions) => {
+        if (!cancelled) setAgentSessions(sessions);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshNonce]);
 
   useEffect(() => {
     let cancelled = false;
@@ -467,6 +481,7 @@ export default function AgentActivityWorkspace({
       <AgentStreamPanel
         filters={filters}
         events={displayedEvents}
+        sessions={agentSessions}
         summary={summary}
         error={error}
         loading={usesAgentThreadView ? agentLoading : activityLoading}

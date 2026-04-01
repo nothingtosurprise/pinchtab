@@ -288,6 +288,20 @@ export async function fetchAgents(): Promise<Agent[]> {
   return request<Agent[]>("/api/agents");
 }
 
+export interface AgentSession {
+  id: string;
+  agentId: string;
+  label?: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  status: string;
+}
+
+export async function fetchAgentSessions(): Promise<AgentSession[]> {
+  return request<AgentSession[]>("/api/agent-sessions");
+}
+
 export async function fetchAgent(
   id: string,
   mode?: string,
