@@ -15,6 +15,7 @@ interface AgentStreamPanelProps {
   loading: boolean;
   copyTabId?: boolean;
   hideAgentFilter?: boolean;
+  hideSessionFilter?: boolean;
   simplifyMeta?: boolean;
   onClearFilters: () => void;
   onFilterChange: (key: keyof ActivityFilters, value: string) => void;
@@ -29,6 +30,7 @@ export default function AgentStreamPanel({
   loading,
   copyTabId = false,
   hideAgentFilter = false,
+  hideSessionFilter = false,
   simplifyMeta = false,
   onClearFilters,
   onFilterChange,
@@ -83,6 +85,7 @@ export default function AgentStreamPanel({
       <ActiveFilterBar
         filters={filters}
         hideAgentFilter={hideAgentFilter}
+        hideSessionFilter={hideSessionFilter}
         onClear={onClearFilters}
       />
 

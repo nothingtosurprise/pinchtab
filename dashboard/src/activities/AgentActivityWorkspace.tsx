@@ -346,6 +346,89 @@ export default function AgentActivityWorkspace({
     ? agentThreadEvents
     : visibleEvents;
 
+  const derivedSessions = useMemo<api.AgentSession[]>(() => {
+    const bySession = new Map<string, {
+      agentId: string;
+      label?: string;
+      earliest: string;
+      latest: string;
+    }>();
+
+    for (const s of agentSessions) {
+      bySession.set(s.id, {
+        agentId: s.agentId,
+        label: s.label,
+        earliest: s.createdAt,
+        latest: s.lastSeenAt || s.createdAt,
+      });
+    }
+
+    const sourceEvents = usesAgentThreadView && filters.agentId
+      ? (agentEventsById[filters.agentId] ?? []).map(toDashboardActivityEvent)
+      : visibleEvents;
+
+    for (const event of sourceEvents) {
+      const sid = event.sessionId?.trim();
+      if (!sid) continue;
+
+      const existing = bySession.get(sid);
+      if (!existing) {
+        bySession.set(sid, {
+          agentId: event.agentId || "",
+          earliest: event.timestamp,
+          latest: event.timestamp,
+        });
+        continue;
+      }
+
+      const ts = new Date(event.timestamp).getTime();
+      if (ts < new Date(existing.earliest).getTime()) existing.earliest = event.timestamp;
+      if (ts > new Date(existing.latest).getTime()) existing.latest = event.timestamp;
+    }
+
+    return [...bySession.entries()]
+      .map(([id, info]) => ({
+        id,
+        agentId: info.agentId,
+        label: info.label,
+        createdAt: info.earliest,
+        lastSeenAt: info.latest,
+        expiresAt: "",
+        status: "active",
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime(),
+      );
+  }, [usesAgentThreadView, filters.agentId, agentEventsById, visibleEvents, agentSessions]);
+
+  const unlabeledPtsKey = useMemo(() => {
+    const apiIds = new Set(agentSessions.map((s) => s.id));
+    return derivedSessions
+      .filter((s) => s.id.startsWith("pts_") && !apiIds.has(s.id))
+      .map((s) => s.id)
+      .sort()
+      .join(",");
+  }, [derivedSessions, agentSessions]);
+
+  useEffect(() => {
+    if (!unlabeledPtsKey) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void api
+        .fetchAgentSessions()
+        .then((sessions) => {
+          if (!cancelled) setAgentSessions(sessions);
+        })
+        .catch(() => {});
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [unlabeledPtsKey]);
+
   const derivedAgents = useMemo<Agent[]>(() => {
     const byId = new Map<string, Agent>();
 
@@ -423,14 +506,23 @@ export default function AgentActivityWorkspace({
     if (!requireSelectedAgent || visibleAgents.length === 0) {
       return;
     }
-    if (visibleAgents.some((agent) => agent.id === filters.agentId)) {
-      return;
+
+    const hasAgent = visibleAgents.some((agent) => agent.id === filters.agentId);
+    const targetAgent = hasAgent
+      ? filters.agentId
+      : visibleAgents[0].id;
+    const agentSessionList = derivedSessions
+      .filter((s) => s.agentId === targetAgent);
+    const latestSession = agentSessionList.length > 0 ? agentSessionList[0].id : "";
+
+    if (!hasAgent || (!filters.sessionId && latestSession)) {
+      setFilters((current) => ({
+        ...current,
+        agentId: targetAgent,
+        sessionId: latestSession,
+      }));
     }
-    setFilters((current) => ({
-      ...current,
-      agentId: visibleAgents[0].id,
-    }));
-  }, [filters.agentId, requireSelectedAgent, visibleAgents]);
+  }, [filters.agentId, filters.sessionId, requireSelectedAgent, visibleAgents, derivedSessions]);
 
   const updateFilter = (key: keyof ActivityFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -478,25 +570,12 @@ export default function AgentActivityWorkspace({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden xl:flex-row">
-      <AgentStreamPanel
-        filters={filters}
-        events={displayedEvents}
-        sessions={agentSessions}
-        summary={summary}
-        error={error}
-        loading={usesAgentThreadView ? agentLoading : activityLoading}
-        copyTabId={copyTabId}
-        hideAgentFilter={requireSelectedAgent}
-        simplifyMeta={simplifyEventRows}
-        onClearFilters={clearFilters}
-        onFilterChange={updateFilter}
-      />
-
       <AgentWorkspaceSidebar
         sidebarTab={sidebarTab}
         visibleAgents={visibleAgents}
         activeAgentId={filters.agentId}
         filters={filters}
+        sessions={derivedSessions}
         showAllAgentsOption={showAllAgentsOption}
         showAgentFilter={showAgentFilter}
         profiles={profiles}
@@ -504,12 +583,39 @@ export default function AgentActivityWorkspace({
         visibleTabs={visibleTabs}
         loading={sidebarLoading}
         onSidebarTabChange={setSidebarTab}
-        onSelectAgent={(agentId) => updateFilter("agentId", agentId)}
+        onSelectAgent={(agentId, autoSessionId) => {
+          setFilters((current) => ({
+            ...current,
+            agentId,
+            sessionId: autoSessionId || "",
+          }));
+        }}
+        onSelectSession={(sessionId) => {
+          setFilters((current) => ({
+            ...current,
+            sessionId,
+          }));
+        }}
         onClearFilters={clearFilters}
         onRefresh={() => setRefreshNonce((current) => current + 1)}
         onFilterChange={updateFilter}
         onProfileChange={handleProfileChange}
         onInstanceChange={handleInstanceChange}
+      />
+
+      <AgentStreamPanel
+        filters={filters}
+        events={displayedEvents}
+        sessions={derivedSessions}
+        summary={summary}
+        error={error}
+        loading={usesAgentThreadView ? agentLoading : activityLoading}
+        copyTabId={copyTabId}
+        hideAgentFilter={requireSelectedAgent}
+        hideSessionFilter={requireSelectedAgent}
+        simplifyMeta={simplifyEventRows}
+        onClearFilters={clearFilters}
+        onFilterChange={updateFilter}
       />
     </div>
   );

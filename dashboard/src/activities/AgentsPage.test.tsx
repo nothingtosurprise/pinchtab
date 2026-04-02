@@ -12,10 +12,11 @@ vi.mock("./api", () => ({
 vi.mock("../services/api", () => ({
   fetchAllTabs: vi.fn(),
   fetchAgent: vi.fn(),
+  fetchAgentSessions: vi.fn(),
 }));
 
 import { fetchActivity } from "./api";
-import { fetchAgent, fetchAllTabs } from "../services/api";
+import { fetchAgent, fetchAgentSessions, fetchAllTabs } from "../services/api";
 
 describe("AgentsPage", () => {
   beforeEach(() => {
@@ -36,6 +37,7 @@ describe("AgentsPage", () => {
       currentTabs: {},
     });
     vi.mocked(fetchAllTabs).mockResolvedValue([]);
+    vi.mocked(fetchAgentSessions).mockResolvedValue([]);
     vi.mocked(fetchAgent).mockResolvedValue({
       agent: {
         id: "cli",
@@ -224,7 +226,7 @@ describe("AgentsPage", () => {
         channel: "progress",
         type: "progress",
         method: "POST",
-        path: "/api/agents/worker-2/events",
+        path: "/navigate",
         message: "Planning next step",
         timestamp: "2026-03-16T09:00:04Z",
       } as any);
@@ -234,7 +236,7 @@ describe("AgentsPage", () => {
         channel: "progress",
         type: "progress",
         method: "POST",
-        path: "/api/agents/cli/events",
+        path: "/action",
         message: "Planning next step",
         timestamp: "2026-03-16T09:00:05Z",
         details: {

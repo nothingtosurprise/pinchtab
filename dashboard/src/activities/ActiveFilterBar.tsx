@@ -3,12 +3,14 @@ import type { ActivityFilters } from "./types";
 interface ActiveFilterBarProps {
   filters: ActivityFilters;
   hideAgentFilter?: boolean;
+  hideSessionFilter?: boolean;
   onClear: () => void;
 }
 
 export default function ActiveFilterBar({
   filters,
   hideAgentFilter = false,
+  hideSessionFilter = false,
   onClear,
 }: ActiveFilterBarProps) {
   const activeFilters = [
@@ -17,7 +19,7 @@ export default function ActiveFilterBar({
     filters.instanceId ? `instance:${filters.instanceId}` : "",
     filters.tabId ? `tab:${filters.tabId}` : "",
     filters.action ? `action:${filters.action}` : "",
-    filters.sessionId ? `session:${filters.sessionId}` : "",
+    !hideSessionFilter && filters.sessionId ? `session:${filters.sessionId}` : "",
     filters.pathPrefix ? `path:${filters.pathPrefix}` : "",
   ].filter(Boolean);
 

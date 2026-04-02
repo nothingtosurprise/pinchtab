@@ -50,7 +50,7 @@ type Store struct {
 }
 
 const (
-	DefaultIdleTimeout = 30 * time.Minute
+	DefaultIdleTimeout = 12 * time.Hour
 	DefaultMaxLifetime = 24 * time.Hour
 
 	StatusActive  = "active"

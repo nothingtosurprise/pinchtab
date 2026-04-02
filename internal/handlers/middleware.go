@@ -120,6 +120,10 @@ func AuthMiddlewareWithSessions(cfg *config.RuntimeConfig, sessions *authn.Sessi
 			// Inject agent identity into request headers for activity tracking
 			r.Header.Set(activity.HeaderAgentID, sess.AgentID)
 			r.Header.Set(activity.HeaderPTSessionID, sess.ID)
+			activity.EnrichRequest(r, activity.Update{
+				AgentID:   sess.AgentID,
+				SessionID: sess.ID,
+			})
 		case authn.MethodHeader:
 			if subtle.ConstantTimeCompare([]byte(creds.Value), []byte(token)) != 1 {
 				authn.ClearSessionCookie(w, r, cfg != nil && cfg.TrustProxyHeaders, cookieSecureSetting(cfg))
@@ -397,7 +401,7 @@ var (
 
 const (
 	rateLimitWindow  = 10 * time.Second
-	rateLimitMaxReq  = 120
+	rateLimitMaxReq  = 300
 	evictionInterval = 30 * time.Second
 )
 
