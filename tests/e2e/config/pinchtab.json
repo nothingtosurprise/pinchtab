@@ -38,7 +38,7 @@
     "allowDownload": true,
     "allowUpload": true,
     "allowClipboard": true,
-    "downloadAllowedDomains": ["fixtures"],
+    "downloadAllowedDomains": ["fixtures", "httpbin.org"],
     "attach": {
       "enabled": true,
       "allowHosts": [
