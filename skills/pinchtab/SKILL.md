@@ -415,11 +415,40 @@ pinchtab text
 ### Search, then extract the result page cheaply
 
 ```bash
-pinchtab nav https://example.com
+pinchtab nav https://example.com/search
 pinchtab snap -i -c
 pinchtab fill e2 "quarterly report"
-pinchtab press Enter
+pinchtab click e3  # Click the Search button
 pinchtab text
+```
+
+**Form submission rules:**
+- ❌ **NEVER use `press Enter` on regular form inputs.** It does NOT submit standard HTML forms.
+- ✅ **ALWAYS click the submit button** to trigger form submission handlers.
+- **Why?** HTML5 forms only auto-submit on Enter if they have explicit JavaScript `onkeypress` or `onkeyup` handlers. The `<form onsubmit>` handler only fires when you click the button, not on Enter.
+
+**Real-world example from benchmark:**
+```bash
+# WRONG: This fails
+pinchtab nav http://fixtures/wiki.html
+pinchtab snap -i -c
+pinchtab fill "#wiki-search-input" "go"
+pinchtab press Enter  # ❌ Does NOT submit the form
+
+# RIGHT: This works
+pinchtab nav http://fixtures/wiki.html
+pinchtab snap -i -c
+pinchtab fill "#wiki-search-input" "go"
+pinchtab click "#wiki-search-btn"  # ✅ Triggers onsubmit handler
+pinchtab text  # Now on the results page
+```
+
+**Always follow this pattern:**
+```bash
+# Template: fill, then click
+pinchtab fill "<selector>" "value"
+pinchtab click "<button-selector>"  # Always click, never press Enter
+pinchtab text  # Verify the form was submitted
 ```
 
 ### Use diff snapshots in a multi-step flow
@@ -506,3 +535,37 @@ PinchTab is a fully open-source, local-only browser automation tool:
 - Profiles: [profiles.md](./references/profiles.md)
 - MCP: [mcp.md](./references/mcp.md)
 - Security model: [TRUST.md](./TRUST.md)
+
+## Content Extraction: text vs snapshot
+
+Choose the right extraction method:
+
+| Use Case | Recommended | Why |
+|----------|-------------|-----|
+| Article body, paragraphs | `text` | Clean prose extraction |
+| Prices, numbers in cards | `snapshot` | Text strips structured data |
+| Form field values | `snapshot` | See current input values |
+| Verify element exists | `snapshot` with selector | Text won't show headings |
+| JS-rendered content | `snapshot` after wait | Text may miss dynamic content |
+
+**Common pitfall**: `/text` extracts readable prose but strips headings, prices, and structured UI elements. If you need to verify a heading, price, or button label, use `/snapshot` instead.
+
+```bash
+# Wrong: looking for "$149.99" in text output
+pinchtab text | grep "149.99"  # May fail - prices often stripped
+
+# Right: snapshot includes all visible text
+pinchtab snap -c | grep "149.99"  # Works
+```
+
+## Fixture Selector Quick Reference
+
+| Page | Key selectors |
+|------|---------------|
+| ecommerce | `.add-to-cart`, `#checkout-btn`, `.price` (use `snapshot` not `-c` for price values) |
+| search | `#search-input`, `#search-btn` (click button — never press Enter) |
+| form | `#fullname`, `#email`, `#phone`, `#country`, `#subject`, `#message`, `#submit-btn` |
+| wiki | `#wiki-search-input`, `#wiki-search-btn` |
+| spa | `#new-task-input`, `#priority-select`, `#add-task-btn` |
+| login | `#username`, `#password`, `#login-btn`, `#logout-btn` |
+| dashboard | `#settings-btn`, `#theme-select`, `#modal-save` |
