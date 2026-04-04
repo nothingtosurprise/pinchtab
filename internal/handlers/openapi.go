@@ -41,9 +41,9 @@ func (h *Handlers) HandleOpenAPI(w http.ResponseWriter, _ *http.Request) {
 		},
 		"x-pinchtab-security": security,
 		"paths": map[string]any{
-			"/health":          map[string]any{"get": map[string]any{"summary": "Health"}},
-			"/browser/restart": map[string]any{"post": map[string]any{"summary": "Soft restart the browser process without restarting the bridge"}},
-			"/tabs":            map[string]any{"get": map[string]any{"summary": "List tabs"}},
+			"/health":            map[string]any{"get": map[string]any{"summary": "Health"}},
+			"/browser/restart":   map[string]any{"post": map[string]any{"summary": "Soft restart the browser process without restarting the bridge"}},
+			"/tabs":              map[string]any{"get": map[string]any{"summary": "List tabs"}},
 			"/tabs/{id}/handoff": map[string]any{"post": map[string]any{"summary": "Pause tab automation for human handoff"}, "get": map[string]any{"summary": "Get tab handoff status"}},
 			"/tabs/{id}/resume":  map[string]any{"post": map[string]any{"summary": "Resume tab automation after handoff"}},
 			"/metrics":         map[string]any{"get": map[string]any{"summary": "Runtime metrics"}},
