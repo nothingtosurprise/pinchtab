@@ -35,6 +35,7 @@ type RuntimeConfig struct {
 
 	// Browser/instance settings
 	Headless          bool
+	HeadlessSet       bool  // true when explicitly set via config or flag   
 	NoRestore         bool
 	ProfileDir        string
 	ProfilesBaseDir   string

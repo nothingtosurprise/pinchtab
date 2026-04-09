@@ -330,6 +330,7 @@ func applyFileConfig(cfg *RuntimeConfig, fc *FileConfig) {
 	// Instance defaults
 	if fc.InstanceDefaults.Mode != "" {
 		cfg.Headless = modeToHeadless(fc.InstanceDefaults.Mode, cfg.Headless)
+		cfg.HeadlessSet = true
 	}
 	if fc.InstanceDefaults.NoRestore != nil {
 		cfg.NoRestore = *fc.InstanceDefaults.NoRestore
