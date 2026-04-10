@@ -23,8 +23,10 @@ The default security posture is:
 - `security.attach.enabled = false`
 - `security.attach.allowHosts = ["127.0.0.1", "localhost", "::1"]`
 - `security.attach.allowSchemes = ["ws", "wss"]`
+- `security.allowedDomains = ["127.0.0.1", "localhost", "::1"]`
+- `security.trustedProxyCIDRs = []`
+- `security.trustedResolveCIDRs = []`
 - `security.idpi.enabled = true`
-- `security.idpi.allowedDomains = ["127.0.0.1", "localhost", "::1"]`
 - `security.idpi.strictMode = true`
 - `security.idpi.scanContent = true`
 - `security.idpi.wrapContent = true`
@@ -221,9 +223,11 @@ The default local-only IDPI config is:
 ```json
 {
   "security": {
+    "allowedDomains": ["127.0.0.1", "localhost", "::1"],
+    "trustedProxyCIDRs": [],
+    "trustedResolveCIDRs": [],
     "idpi": {
       "enabled": true,
-      "allowedDomains": ["127.0.0.1", "localhost", "::1"],
       "strictMode": true,
       "scanContent": true,
       "wrapContent": true,
@@ -237,11 +241,18 @@ Important notes:
 
 - if `allowedDomains` is empty, the main domain restriction is not doing useful work
 - if `allowedDomains` contains `"*"`, the whitelist effectively allows everything
+- `security.allowedDomains` is the canonical config path. `security.idpi.allowedDomains` is still accepted when loading older config files, but new saves are normalized to `security.allowedDomains`
 - `strictMode = true` blocks disallowed domains and suspicious content
 - `strictMode = false` allows the request but emits warnings instead
 - `scanContent` protects `/text` and `/snapshot` style extraction paths
 - `wrapContent` adds explicit untrusted-content framing for downstream consumers
 - widening navigation to non-local or non-trusted sites is still a security-reducing choice; IDPI lowers risk, but it does not make hostile pages safe or remove browser attack surface
+
+For navigation trust overrides:
+
+- `security.trustedResolveCIDRs` lets a hostname resolve to a non-public IP during navigation preflight. This is intended for operator-controlled DNS or proxy setups such as internal proxies, lab networks, or benchmark ranges
+- `security.trustedProxyCIDRs` trusts browser-reported remote IPs from known internal proxies during runtime navigation checks
+- keep both lists narrow. Broad ranges such as `10.0.0.0/8` reduce SSRF protections and should only be used when the full network segment is intentionally trusted
 
 Supported domain patterns are:
 
@@ -267,6 +278,9 @@ For a secure local setup:
     "allowScreencast": false,
     "allowDownload": false,
     "allowUpload": false,
+    "allowedDomains": ["127.0.0.1", "localhost", "::1"],
+    "trustedProxyCIDRs": [],
+    "trustedResolveCIDRs": [],
     "attach": {
       "enabled": false,
       "allowHosts": ["127.0.0.1", "localhost", "::1"],
@@ -274,7 +288,6 @@ For a secure local setup:
     },
     "idpi": {
       "enabled": true,
-      "allowedDomains": ["127.0.0.1", "localhost", "::1"],
       "strictMode": true,
       "scanContent": true,
       "wrapContent": true,

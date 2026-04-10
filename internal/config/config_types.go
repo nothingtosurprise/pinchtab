@@ -34,6 +34,7 @@ type RuntimeConfig struct {
 	UploadMaxTotalBytes    int
 	MaxRedirects           int      // Max HTTP redirects (-1=unlimited, 0=none, default=-1)
 	TrustedProxyCIDRs      []string // CIDRs/IPs whose RemoteIPAddress is trusted in navigation responses (e.g. internal proxy)
+	TrustedResolveCIDRs    []string // CIDRs/IPs allowed when a navigation target resolves to non-public addresses
 
 	// Browser/instance settings
 	Headless          bool
@@ -266,6 +267,7 @@ type SecurityConfig struct {
 	AllowMacro             *bool        `json:"allowMacro,omitempty"`
 	AllowScreencast        *bool        `json:"allowScreencast,omitempty"`
 	AllowDownload          *bool        `json:"allowDownload,omitempty"`
+	AllowedDomains         []string     `json:"allowedDomains,omitempty"`
 	DownloadAllowedDomains []string     `json:"downloadAllowedDomains,omitempty"`
 	DownloadMaxBytes       *int         `json:"downloadMaxBytes,omitempty"`
 	AllowUpload            *bool        `json:"allowUpload,omitempty"`
@@ -278,6 +280,7 @@ type SecurityConfig struct {
 	UploadMaxTotalBytes    *int         `json:"uploadMaxTotalBytes,omitempty"`
 	MaxRedirects           *int         `json:"maxRedirects,omitempty"`
 	TrustedProxyCIDRs      []string     `json:"trustedProxyCIDRs,omitempty"`
+	TrustedResolveCIDRs    []string     `json:"trustedResolveCIDRs,omitempty"`
 	Attach                 AttachConfig `json:"attach,omitempty"`
 	IDPI                   IDPIConfig   `json:"idpi,omitempty"`
 }

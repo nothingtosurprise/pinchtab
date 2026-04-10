@@ -181,6 +181,7 @@ Current nested file-config shape:
     "allowMacro": false,
     "allowScreencast": false,
     "allowDownload": false,
+    "allowedDomains": ["127.0.0.1", "localhost", "::1"],
     "downloadAllowedDomains": [],
     "downloadMaxBytes": 20971520,
     "allowUpload": false,
@@ -190,6 +191,8 @@ Current nested file-config shape:
     "uploadMaxFileBytes": 5242880,
     "uploadMaxTotalBytes": 10485760,
     "maxRedirects": -1,
+    "trustedProxyCIDRs": [],
+    "trustedResolveCIDRs": [],
     "attach": {
       "enabled": false,
       "allowHosts": ["127.0.0.1", "localhost", "::1"],
@@ -197,7 +200,6 @@ Current nested file-config shape:
     },
     "idpi": {
       "enabled": true,
-      "allowedDomains": ["127.0.0.1", "localhost", "::1"],
       "strictMode": true,
       "scanContent": true,
       "wrapContent": true,

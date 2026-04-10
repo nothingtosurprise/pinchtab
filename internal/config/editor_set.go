@@ -269,7 +269,12 @@ func setSecurityField(s *SecurityConfig, field, value string) error {
 		return setAttachField(&s.Attach, strings.TrimPrefix(field, "attach."), value)
 	}
 	if strings.HasPrefix(field, "idpi.") {
-		return setIDPIField(&s.IDPI, strings.TrimPrefix(field, "idpi."), value)
+		return setIDPIField(s, strings.TrimPrefix(field, "idpi."), value)
+	}
+	if field == "allowedDomains" {
+		s.AllowedDomains = parseCSVList(value)
+		s.IDPI.AllowedDomains = append([]string(nil), s.AllowedDomains...)
+		return nil
 	}
 	if field == "downloadAllowedDomains" {
 		s.DownloadAllowedDomains = parseCSVList(value)
@@ -277,6 +282,10 @@ func setSecurityField(s *SecurityConfig, field, value string) error {
 	}
 	if field == "trustedProxyCIDRs" {
 		s.TrustedProxyCIDRs = parseCSVList(value)
+		return nil
+	}
+	if field == "trustedResolveCIDRs" {
+		s.TrustedResolveCIDRs = parseCSVList(value)
 		return nil
 	}
 	switch field {
@@ -450,7 +459,8 @@ func setAttachField(a *AttachConfig, field, value string) error {
 	return nil
 }
 
-func setIDPIField(i *IDPIConfig, field, value string) error {
+func setIDPIField(s *SecurityConfig, field, value string) error {
+	i := &s.IDPI
 	switch field {
 	case "enabled":
 		b, err := parseBool(value)
@@ -459,7 +469,8 @@ func setIDPIField(i *IDPIConfig, field, value string) error {
 		}
 		i.Enabled = b
 	case "allowedDomains":
-		i.AllowedDomains = parseCSVList(value)
+		s.AllowedDomains = parseCSVList(value)
+		i.AllowedDomains = append([]string(nil), s.AllowedDomains...)
 	case "strictMode":
 		b, err := parseBool(value)
 		if err != nil {

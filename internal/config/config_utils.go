@@ -96,6 +96,22 @@ func EnsureFileToken(fc *FileConfig) (bool, error) {
 	return true, nil
 }
 
+func effectiveSecurityAllowedDomains(s SecurityConfig) []string {
+	if len(s.AllowedDomains) > 0 {
+		return append([]string(nil), s.AllowedDomains...)
+	}
+	if len(s.IDPI.AllowedDomains) > 0 {
+		return append([]string(nil), s.IDPI.AllowedDomains...)
+	}
+	if s.AllowedDomains != nil {
+		return []string{}
+	}
+	if s.IDPI.AllowedDomains != nil {
+		return []string{}
+	}
+	return nil
+}
+
 func MaskToken(t string) string {
 	if t == "" {
 		return "(none)"

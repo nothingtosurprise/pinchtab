@@ -124,6 +124,9 @@ export interface BackendSecurityConfig {
   allowScreencast: boolean;
   allowDownload: boolean;
   allowUpload: boolean;
+  allowedDomains: string[];
+  trustedProxyCIDRs: string[];
+  trustedResolveCIDRs: string[];
   attach: BackendAttachConfig;
   idpi: BackendIDPIConfig;
 }
@@ -161,7 +164,6 @@ export interface BackendAttachConfig {
 
 export interface BackendIDPIConfig {
   enabled: boolean;
-  allowedDomains: string[];
   strictMode: boolean;
   scanContent: boolean;
   wrapContent: boolean;
@@ -238,6 +240,9 @@ export const defaultBackendConfig: BackendConfig = {
     allowScreencast: false,
     allowDownload: false,
     allowUpload: false,
+    allowedDomains: ["127.0.0.1", "localhost", "::1"],
+    trustedProxyCIDRs: [],
+    trustedResolveCIDRs: [],
     attach: {
       enabled: false,
       allowHosts: ["127.0.0.1", "localhost", "::1"],
@@ -245,7 +250,6 @@ export const defaultBackendConfig: BackendConfig = {
     },
     idpi: {
       enabled: true,
-      allowedDomains: ["127.0.0.1", "localhost", "::1"],
       strictMode: true,
       scanContent: true,
       wrapContent: true,
@@ -332,6 +336,9 @@ export function normalizeBackendConfig(
     security: {
       ...defaultBackendConfig.security,
       ...(input?.security ?? {}),
+      allowedDomains:
+        input?.security?.allowedDomains ??
+        defaultBackendConfig.security.allowedDomains,
       attach: {
         ...defaultBackendConfig.security.attach,
         ...(input?.security?.attach ?? {}),
@@ -345,9 +352,6 @@ export function normalizeBackendConfig(
       idpi: {
         ...defaultBackendConfig.security.idpi,
         ...(input?.security?.idpi ?? {}),
-        allowedDomains:
-          input?.security?.idpi?.allowedDomains ??
-          defaultBackendConfig.security.idpi.allowedDomains,
         customPatterns:
           input?.security?.idpi?.customPatterns ??
           defaultBackendConfig.security.idpi.customPatterns,

@@ -159,6 +159,7 @@ func (c *ConfigAPI) HandlePutConfig(w http.ResponseWriter, r *http.Request) {
 		httpx.ErrorCode(w, 400, "bad_config_json", "invalid config payload", false, nil)
 		return
 	}
+	config.NormalizeFileConfigAliasesFromJSON(&normalized, body)
 
 	if errs := config.ValidateFileConfig(&normalized); len(errs) > 0 {
 		messages := make([]string, 0, len(errs))

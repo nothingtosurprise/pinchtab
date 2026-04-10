@@ -195,6 +195,8 @@ func getSecurityField(s *SecurityConfig, field string) (string, error) {
 		return formatBoolPtr(s.AllowScreencast), nil
 	case "allowDownload":
 		return formatBoolPtr(s.AllowDownload), nil
+	case "allowedDomains":
+		return strings.Join(s.AllowedDomains, ","), nil
 	case "downloadAllowedDomains":
 		return strings.Join(s.DownloadAllowedDomains, ","), nil
 	case "downloadMaxBytes":
@@ -215,6 +217,8 @@ func getSecurityField(s *SecurityConfig, field string) (string, error) {
 		return formatIntPtr(s.MaxRedirects), nil
 	case "trustedProxyCIDRs":
 		return strings.Join(s.TrustedProxyCIDRs, ","), nil
+	case "trustedResolveCIDRs":
+		return strings.Join(s.TrustedResolveCIDRs, ","), nil
 	default:
 		return "", fmt.Errorf("unknown field security.%s", field)
 	}

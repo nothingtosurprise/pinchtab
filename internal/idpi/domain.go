@@ -42,7 +42,7 @@ func CheckDomain(rawURL string, cfg config.IDPIConfig) CheckResult {
 	}
 
 	return makeResult(cfg.StrictMode,
-		fmt.Sprintf("domain %q is not in the allowed list (security.idpi.allowedDomains)", host))
+		fmt.Sprintf("domain %q is not in the allowed list (security.allowedDomains)", host))
 }
 
 // DomainAllowed reports whether rawURL's host matches an explicit allowedDomains

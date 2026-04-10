@@ -102,7 +102,8 @@ func (h *Handlers) HandleNavigate(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-IDPI-Warning", domainResult.Reason)
 	}
 
-	target, err := validateNavigateTarget(req.URL, h.IDPIGuard.DomainAllowed(req.URL))
+	trustedResolveCIDRs := parseCIDRs(h.Config.TrustedResolveCIDRs)
+	target, err := validateNavigateTarget(req.URL, h.IDPIGuard.DomainAllowed(req.URL), trustedResolveCIDRs)
 	if err != nil {
 		httpx.Error(w, http.StatusForbidden, err)
 		return
@@ -356,6 +357,7 @@ func (h *Handlers) HandleTab(w http.ResponseWriter, r *http.Request) {
 	switch req.Action {
 	case tabActionNew:
 		var target *validatedNavigateTarget
+		trustedResolveCIDRs := parseCIDRs(h.Config.TrustedResolveCIDRs)
 		trustedCIDRs := parseCIDRs(h.Config.TrustedProxyCIDRs)
 		if req.URL != "" && req.URL != "about:blank" {
 			if err := validateNavigateURL(req.URL); err != nil {
@@ -371,7 +373,7 @@ func (h *Handlers) HandleTab(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("X-IDPI-Warning", domainResult.Reason)
 			}
 			var err error
-			target, err = validateNavigateTarget(req.URL, h.IDPIGuard.DomainAllowed(req.URL))
+			target, err = validateNavigateTarget(req.URL, h.IDPIGuard.DomainAllowed(req.URL), trustedResolveCIDRs)
 			if err != nil {
 				httpx.Error(w, http.StatusForbidden, err)
 				return

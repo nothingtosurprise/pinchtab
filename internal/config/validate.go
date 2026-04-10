@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -150,8 +151,12 @@ func ValidateFileConfig(fc *FileConfig) []error {
 	}
 
 	// IDPI validation
-	errs = append(errs, validateIDPIConfig(fc.Security.IDPI)...)
+	idpiCfg := fc.Security.IDPI
+	idpiCfg.AllowedDomains = effectiveSecurityAllowedDomains(fc.Security)
+	errs = append(errs, validateIDPIConfig(idpiCfg)...)
 	errs = append(errs, validateAllowedDomainList("security.downloadAllowedDomains", fc.Security.DownloadAllowedDomains)...)
+	errs = append(errs, validateTrustedCIDRList("security.trustedProxyCIDRs", fc.Security.TrustedProxyCIDRs)...)
+	errs = append(errs, validateTrustedCIDRList("security.trustedResolveCIDRs", fc.Security.TrustedResolveCIDRs)...)
 	errs = append(errs, validatePositiveIntLimit("security.downloadMaxBytes", fc.Security.DownloadMaxBytes, MaxDownloadMaxBytes)...)
 	errs = append(errs, validatePositiveIntLimit("security.uploadMaxRequestBytes", fc.Security.UploadMaxRequestBytes, MaxUploadMaxRequestBytes)...)
 	errs = append(errs, validatePositiveIntLimit("security.uploadMaxFiles", fc.Security.UploadMaxFiles, MaxUploadMaxFiles)...)
@@ -332,7 +337,7 @@ func validateIDPIConfig(cfg IDPIConfig) []error {
 		return nil
 	}
 
-	errs := validateAllowedDomainList("security.idpi.allowedDomains", cfg.AllowedDomains)
+	errs := validateAllowedDomainList("security.allowedDomains", cfg.AllowedDomains)
 
 	for _, p := range cfg.CustomPatterns {
 		if strings.TrimSpace(p) == "" {
@@ -374,6 +379,36 @@ func validateAllowedDomainList(field string, domains []string) []error {
 			errs = append(errs, ValidationError{
 				Field:   field,
 				Message: fmt.Sprintf("domain pattern %q must not use the file:// scheme; use a hostname", trimmed),
+			})
+		}
+	}
+	return errs
+}
+
+func validateTrustedCIDRList(field string, items []string) []error {
+	var errs []error
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			errs = append(errs, ValidationError{
+				Field:   field,
+				Message: "entry must not be empty or whitespace-only",
+			})
+			continue
+		}
+		if strings.Contains(trimmed, "/") {
+			if _, _, err := net.ParseCIDR(trimmed); err != nil {
+				errs = append(errs, ValidationError{
+					Field:   field,
+					Message: fmt.Sprintf("entry %q must be a valid CIDR or IP address", trimmed),
+				})
+			}
+			continue
+		}
+		if net.ParseIP(trimmed) == nil {
+			errs = append(errs, ValidationError{
+				Field:   field,
+				Message: fmt.Sprintf("entry %q must be a valid CIDR or IP address", trimmed),
 			})
 		}
 	}

@@ -156,20 +156,20 @@ func AssessSecurityWarnings(cfg *config.RuntimeConfig) []SecurityWarning {
 		warnings = append(warnings, SecurityWarning{
 			ID:      "idpi_disabled",
 			Message: "IDPI disabled; website whitelist inactive",
-			Attrs:   []any{"setting", "security.idpi.enabled", "hint", "enable IDPI and keep security.idpi.allowedDomains scoped to approved websites"},
+			Attrs:   []any{"setting", "security.idpi.enabled", "hint", "enable IDPI and keep security.allowedDomains scoped to approved websites"},
 		})
 	} else {
 		if len(cfg.IDPI.AllowedDomains) == 0 {
 			warnings = append(warnings, SecurityWarning{
 				ID:      "idpi_whitelist_not_set",
 				Message: "website whitelist is not set for IDPI",
-				Attrs:   []any{"setting", "security.idpi.allowedDomains", "hint", "configure allowedDomains to restrict which websites navigation may reach"},
+				Attrs:   []any{"setting", "security.allowedDomains", "hint", "configure allowedDomains to restrict which websites navigation may reach"},
 			})
 		} else if allowsAllDomains(cfg.IDPI.AllowedDomains) {
 			warnings = append(warnings, SecurityWarning{
 				ID:      "idpi_whitelist_allows_all",
 				Message: "website whitelist allows all domains",
-				Attrs:   []any{"setting", "security.idpi.allowedDomains", "hint", "remove '*' and list only approved domains"},
+				Attrs:   []any{"setting", "security.allowedDomains", "hint", "remove '*' and list only approved domains"},
 			})
 		}
 

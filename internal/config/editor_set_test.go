@@ -241,6 +241,19 @@ func TestSetConfigValue_IDPIFields(t *testing.T) {
 	}
 }
 
+func TestSetConfigValue_SecurityAllowedDomainsAlias(t *testing.T) {
+	fc := &FileConfig{}
+	if err := SetConfigValue(fc, "security.allowedDomains", "localhost, example.com"); err != nil {
+		t.Fatalf("SetConfigValue(security.allowedDomains) error = %v", err)
+	}
+	if len(fc.Security.AllowedDomains) != 2 || fc.Security.AllowedDomains[1] != "example.com" {
+		t.Fatalf("security.allowedDomains = %v, want synced values", fc.Security.AllowedDomains)
+	}
+	if len(fc.Security.IDPI.AllowedDomains) != 2 || fc.Security.IDPI.AllowedDomains[1] != "example.com" {
+		t.Fatalf("security.idpi.allowedDomains alias = %v, want synced values", fc.Security.IDPI.AllowedDomains)
+	}
+}
+
 func TestSetConfigValue_TimeoutsFields(t *testing.T) {
 	tests := []struct {
 		path    string

@@ -71,6 +71,7 @@ func DefaultFileConfig() FileConfig {
 			AllowMacro:             &allowMacro,
 			AllowScreencast:        &allowScreencast,
 			AllowDownload:          &allowDownload,
+			AllowedDomains:         append([]string(nil), defaultLocalAllowedDomains...),
 			DownloadAllowedDomains: []string{},
 			DownloadMaxBytes:       &downloadMaxBytes,
 			AllowUpload:            &allowUpload,
@@ -207,6 +208,7 @@ type securityConfigJSON struct {
 	AllowMacro             *bool          `json:"allowMacro"`
 	AllowScreencast        *bool          `json:"allowScreencast"`
 	AllowDownload          *bool          `json:"allowDownload"`
+	AllowedDomains         []string       `json:"allowedDomains"`
 	DownloadAllowedDomains []string       `json:"downloadAllowedDomains"`
 	DownloadMaxBytes       *int           `json:"downloadMaxBytes"`
 	AllowUpload            *bool          `json:"allowUpload"`
@@ -219,6 +221,7 @@ type securityConfigJSON struct {
 	UploadMaxTotalBytes    *int           `json:"uploadMaxTotalBytes"`
 	MaxRedirects           *int           `json:"maxRedirects"`
 	TrustedProxyCIDRs      []string       `json:"trustedProxyCIDRs"`
+	TrustedResolveCIDRs    []string       `json:"trustedResolveCIDRs"`
 	Attach                 attachJSON     `json:"attach"`
 	IDPI                   idpiConfigJSON `json:"idpi"`
 }
@@ -231,7 +234,6 @@ type attachJSON struct {
 
 type idpiConfigJSON struct {
 	Enabled         bool     `json:"enabled"`
-	AllowedDomains  []string `json:"allowedDomains"`
 	StrictMode      bool     `json:"strictMode"`
 	ScanContent     bool     `json:"scanContent"`
 	WrapContent     bool     `json:"wrapContent"`
@@ -371,6 +373,7 @@ func (fc FileConfig) MarshalJSON() ([]byte, error) {
 			AllowMacro:             fc.Security.AllowMacro,
 			AllowScreencast:        fc.Security.AllowScreencast,
 			AllowDownload:          fc.Security.AllowDownload,
+			AllowedDomains:         effectiveSecurityAllowedDomains(fc.Security),
 			DownloadAllowedDomains: copyStringSlice(fc.Security.DownloadAllowedDomains),
 			DownloadMaxBytes:       fc.Security.DownloadMaxBytes,
 			AllowUpload:            fc.Security.AllowUpload,
@@ -383,6 +386,7 @@ func (fc FileConfig) MarshalJSON() ([]byte, error) {
 			UploadMaxTotalBytes:    fc.Security.UploadMaxTotalBytes,
 			MaxRedirects:           fc.Security.MaxRedirects,
 			TrustedProxyCIDRs:      copyStringSlice(fc.Security.TrustedProxyCIDRs),
+			TrustedResolveCIDRs:    copyStringSlice(fc.Security.TrustedResolveCIDRs),
 			Attach: attachJSON{
 				Enabled:      fc.Security.Attach.Enabled,
 				AllowHosts:   copyStringSlice(fc.Security.Attach.AllowHosts),
@@ -390,7 +394,6 @@ func (fc FileConfig) MarshalJSON() ([]byte, error) {
 			},
 			IDPI: idpiConfigJSON{
 				Enabled:         fc.Security.IDPI.Enabled,
-				AllowedDomains:  copyStringSlice(fc.Security.IDPI.AllowedDomains),
 				StrictMode:      fc.Security.IDPI.StrictMode,
 				ScanContent:     fc.Security.IDPI.ScanContent,
 				WrapContent:     fc.Security.IDPI.WrapContent,
@@ -470,6 +473,17 @@ func (fc FileConfig) MarshalJSON() ([]byte, error) {
 			},
 		},
 	})
+}
+
+func (fc *FileConfig) UnmarshalJSON(data []byte) error {
+	type rawFileConfig FileConfig
+	tmp := rawFileConfig(*fc)
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	*fc = FileConfig(tmp)
+	NormalizeFileConfigAliasesFromJSON(fc, data)
+	return nil
 }
 
 // FileConfigFromRuntime converts the effective runtime configuration back into a
@@ -573,6 +587,7 @@ func FileConfigFromRuntime(cfg *RuntimeConfig) FileConfig {
 			AllowMacro:             &allowMacro,
 			AllowScreencast:        &allowScreencast,
 			AllowDownload:          &allowDownload,
+			AllowedDomains:         append([]string(nil), cfg.IDPI.AllowedDomains...),
 			DownloadAllowedDomains: downloadAllowedDomains,
 			DownloadMaxBytes:       &downloadMaxBytes,
 			AllowUpload:            &allowUpload,
@@ -585,6 +600,7 @@ func FileConfigFromRuntime(cfg *RuntimeConfig) FileConfig {
 			UploadMaxTotalBytes:    &uploadMaxTotalBytes,
 			MaxRedirects:           &maxRedirects,
 			TrustedProxyCIDRs:      append([]string(nil), cfg.TrustedProxyCIDRs...),
+			TrustedResolveCIDRs:    append([]string(nil), cfg.TrustedResolveCIDRs...),
 			Attach: AttachConfig{
 				Enabled:      &attachEnabled,
 				AllowHosts:   append([]string(nil), cfg.AttachAllowHosts...),

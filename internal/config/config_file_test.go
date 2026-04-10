@@ -282,6 +282,7 @@ func TestFileConfigJSONPreservesExplicitZeroValues(t *testing.T) {
 	fc.Browser.ExtensionPaths = []string{}
 	fc.InstanceDefaults.UserAgent = ""
 	fc.Security.IDPI.StrictMode = false
+	fc.Security.AllowedDomains = []string{}
 	fc.Security.IDPI.AllowedDomains = []string{}
 	fc.Security.IDPI.CustomPatterns = []string{}
 	fc.Security.IDPI.ShieldThreshold = 30
@@ -313,10 +314,13 @@ func TestFileConfigJSONPreservesExplicitZeroValues(t *testing.T) {
 	if strictMode, ok := idpi["strictMode"]; !ok || strictMode != false {
 		t.Fatalf("security.idpi.strictMode = %#v, want explicit false", strictMode)
 	}
-	if allowedDomains, ok := idpi["allowedDomains"]; !ok {
-		t.Fatal("security.idpi.allowedDomains missing from JSON")
+	if allowedDomains, ok := security["allowedDomains"]; !ok {
+		t.Fatal("security.allowedDomains missing from JSON")
 	} else if items, ok := allowedDomains.([]any); !ok || len(items) != 0 {
-		t.Fatalf("security.idpi.allowedDomains = %#v, want explicit empty list", allowedDomains)
+		t.Fatalf("security.allowedDomains = %#v, want explicit empty list", allowedDomains)
+	}
+	if _, ok := idpi["allowedDomains"]; ok {
+		t.Fatal("security.idpi.allowedDomains should not be emitted in JSON")
 	}
 	if raw, ok := idpi["shieldThreshold"]; !ok || int(raw.(float64)) != 30 {
 		t.Fatalf("security.idpi.shieldThreshold = %#v, want 30", raw)

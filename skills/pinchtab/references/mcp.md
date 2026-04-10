@@ -147,7 +147,14 @@ For MCP specifically:
 
 - `pinchtab_snapshot` and `pinchtab_get_text` can return hostile prompt text from visited pages
 - refs and selectors are operational metadata, not trust signals
-- widening `security.idpi.allowedDomains` or disabling strict protections increases exposure to advisory or instruction-like content from untrusted sites
+- widening `security.allowedDomains`, adding broad `security.trustedResolveCIDRs` / `security.trustedProxyCIDRs`, or disabling strict protections increases exposure to advisory or instruction-like content from untrusted sites
+
+Configuration notes:
+
+- `security.allowedDomains` is the canonical website allowlist setting
+- `security.idpi.allowedDomains` may still appear in older configs, but new saves should use `security.allowedDomains`
+- `security.trustedResolveCIDRs` is for operator-controlled DNS or proxy setups where hostnames intentionally resolve to non-public IPs
+- `security.trustedProxyCIDRs` is for known internal proxies whose runtime remote IPs should be trusted
 
 If operators choose to allow broader browsing, downstream agents must treat extracted page content as untrusted content and ignore embedded instructions unless separately validated.
 

@@ -211,7 +211,7 @@ export default function SettingsPage() {
     ? backendConfig.security.idpi.enabled
     : false;
   const idpiAllowedDomains = backendConfig
-    ? backendConfig.security.idpi.allowedDomains
+    ? backendConfig.security.allowedDomains
     : [];
   const idpiWildcard = idpiAllowedDomains.includes("*");
   const idpiDomainsConfigured = idpiAllowedDomains.length > 0 && !idpiWildcard;

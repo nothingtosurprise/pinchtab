@@ -57,6 +57,7 @@ func TestGetConfigValue_RoundTrip(t *testing.T) {
 		{"multiInstance.restart.stableAfterSec", "600", "600"},
 		{"security.attach.enabled", "true", "true"},
 		{"security.idpi.enabled", "true", "true"},
+		{"security.allowedDomains", "localhost,example.com", "localhost,example.com"},
 		{"security.idpi.allowedDomains", "localhost,example.com", "localhost,example.com"},
 		{"security.idpi.strictMode", "false", "false"},
 		{"security.idpi.scanContent", "true", "true"},

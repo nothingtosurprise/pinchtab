@@ -562,7 +562,7 @@ func TestValidateIDPIConfig_EmptyDomain(t *testing.T) {
 			if len(errs) == 0 {
 				t.Errorf("expected error for empty domain %q, got none", tc.domain)
 			}
-			if len(errs) > 0 && !strings.Contains(errs[0].Error(), "security.idpi.allowedDomains") {
+			if len(errs) > 0 && !strings.Contains(errs[0].Error(), "security.allowedDomains") {
 				t.Errorf("expected field name in error, got: %v", errs[0])
 			}
 		})
@@ -628,6 +628,60 @@ func TestValidateFileConfig_DownloadAllowedDomains(t *testing.T) {
 			}
 			if tt.wantErr && !strings.Contains(errs[0].Error(), "security.downloadAllowedDomains") {
 				t.Fatalf("expected security.downloadAllowedDomains error, got %v", errs[0])
+			}
+		})
+	}
+}
+
+func TestValidateFileConfig_TrustedCIDRs(t *testing.T) {
+	tests := []struct {
+		name    string
+		proxy   []string
+		resolve []string
+		wantErr bool
+		field   string
+	}{
+		{
+			name:    "valid IPv4 CIDR and IP",
+			proxy:   []string{"10.0.0.0/8", "10.1.2.3"},
+			resolve: []string{"198.18.0.0/15"},
+			wantErr: false,
+		},
+		{
+			name:    "valid IPv6 host and prefix",
+			proxy:   []string{"fd00::1234", "fd00::/64"},
+			resolve: []string{"2001:db8::1/128"},
+			wantErr: false,
+		},
+		{
+			name:    "invalid trusted proxy entry",
+			proxy:   []string{"not-a-cidr"},
+			wantErr: true,
+			field:   "security.trustedProxyCIDRs",
+		},
+		{
+			name:    "invalid trusted resolve entry",
+			resolve: []string{"10.0.0.0/99"},
+			wantErr: true,
+			field:   "security.trustedResolveCIDRs",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fc := &FileConfig{
+				Security: SecurityConfig{
+					TrustedProxyCIDRs:   tt.proxy,
+					TrustedResolveCIDRs: tt.resolve,
+				},
+			}
+			errs := ValidateFileConfig(fc)
+			hasErr := len(errs) > 0
+			if hasErr != tt.wantErr {
+				t.Fatalf("ValidateFileConfig(proxy=%v, resolve=%v) error=%v, want %v (errs: %v)", tt.proxy, tt.resolve, hasErr, tt.wantErr, errs)
+			}
+			if tt.field != "" && len(errs) > 0 && !strings.Contains(errs[0].Error(), tt.field) {
+				t.Fatalf("expected error to mention %s, got %v", tt.field, errs[0])
 			}
 		})
 	}
