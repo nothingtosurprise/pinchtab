@@ -61,9 +61,16 @@ PinchTab also provides a CLI with an interactive entry point for local setup and
 PinchTab defaults to a **local-first security posture**:
 
 - `server.bind = 127.0.0.1`
+- dashboard session cookies are `Secure` only when the dashboard is actually served over HTTPS
 - sensitive endpoint families are disabled by default
 - `attach` is disabled by default
 - IDPI is enabled with a **local-only website allowlist**
+
+If you intentionally access the dashboard over plain HTTP on a non-loopback
+address, PinchTab now warns in the UI that the session is running without
+transport encryption. Prefer HTTPS or localhost when possible. If you force
+`server.cookieSecure = true`, dashboard login requires HTTPS and will fail
+explicitly on plain HTTP instead of looping silently.
 
 > [!CAUTION]
 > By default, IDPI restricts browsing to **locally hosted websites only**.

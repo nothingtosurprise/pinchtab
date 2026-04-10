@@ -80,6 +80,14 @@ func (a *AuthAPI) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.requiresHTTPSForDashboardSession(r) {
+		httpx.ErrorCode(w, http.StatusBadRequest, "secure_cookie_requires_https", "server.cookieSecure=true requires HTTPS for dashboard login", false, map[string]any{
+			"hint":   "Use HTTPS directly or through a trusted reverse proxy, or set server.cookieSecure back to auto/false for plain HTTP local use.",
+			"remedy": "If TLS terminates in front of PinchTab, also enable server.trustProxyHeaders so forwarded https requests are recognized.",
+		})
+		return
+	}
+
 	if subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
 		if a.loginLimiter != nil {
 			a.loginLimiter.RecordFailure(clientIP)
@@ -183,6 +191,13 @@ func cookieSecureSetting(cfg *config.RuntimeConfig) *bool {
 		return nil
 	}
 	return cfg.CookieSecure
+}
+
+func (a *AuthAPI) requiresHTTPSForDashboardSession(r *http.Request) bool {
+	if a == nil || a.runtime == nil || a.runtime.CookieSecure == nil || !*a.runtime.CookieSecure {
+		return false
+	}
+	return !authn.RequestIsHTTPS(r, a.runtime.TrustProxyHeaders)
 }
 
 func secondsCeil(d time.Duration) int {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/target"
-	"github.com/chromedp/chromedp"
 	"github.com/pinchtab/pinchtab/internal/bridge"
 	"github.com/pinchtab/pinchtab/internal/config"
 	"github.com/pinchtab/pinchtab/internal/netguard"
@@ -26,11 +25,14 @@ type downloadPolicyBridge struct {
 }
 
 func (m *downloadPolicyBridge) BrowserContext() context.Context {
-	return context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately - no browser spawned
+	return ctx
 }
 
 func (m *downloadPolicyBridge) TabContext(tabID string) (context.Context, string, error) {
-	ctx, _ := chromedp.NewContext(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately - no browser spawned
 	return ctx, tabID, nil
 }
 

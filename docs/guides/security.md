@@ -99,9 +99,32 @@ The browser dashboard uses a different flow:
    elevation
 
 By default, PinchTab auto-detects whether the dashboard session cookie should
-use the `Secure` flag. For reverse-proxied HTTPS this stays enabled. If you
-intentionally access the dashboard over plain HTTP on a trusted LAN, you can
-explicitly disable it:
+use the `Secure` flag. In `auto` mode, HTTPS requests get `Secure` cookies and
+plain HTTP requests do not.
+
+That means:
+
+- reverse-proxied HTTPS keeps `Secure` enabled
+- plain `http://localhost:9867` keeps working for local-only use
+- plain `http://192.168.x.x:9867` or `http://10.x.x.x:9867` works, but the
+  dashboard warns that the session is running over insecure HTTP
+
+If you want to require HTTPS for dashboard login, force `server.cookieSecure`
+to `true`:
+
+```json
+{
+  "server": {
+    "cookieSecure": true
+  }
+}
+```
+
+On plain HTTP, that now fails explicitly with an HTTPS-required login error
+instead of appearing to succeed and then looping.
+
+If you intentionally need plain HTTP on a trusted LAN, you can also force
+`cookieSecure` off explicitly:
 
 ```json
 {
@@ -110,6 +133,14 @@ explicitly disable it:
   }
 }
 ```
+
+Recommended usage:
+
+- leave `cookieSecure` unset (`auto`) unless you have a reason to override it
+- use `cookieSecure: true` when TLS is in front of PinchTab
+- only use `cookieSecure: false` on operator-controlled plain-HTTP deployments
+- if TLS terminates at a trusted reverse proxy, enable
+  `server.trustProxyHeaders` so forwarded HTTPS requests are recognized
 
 Why this matters:
 

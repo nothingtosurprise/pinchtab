@@ -153,7 +153,8 @@ Current nested file-config shape:
     "stateDir": "/path/to/state",
     "engine": "chrome",
     "networkBufferSize": 100,
-    "trustProxyHeaders": false
+    "trustProxyHeaders": false,
+    "cookieSecure": null
   },
   "browser": {
     "version": "144.0.7559.133",
@@ -360,6 +361,36 @@ pinchtab server
 ```
 
 Changing `server.bind` away from loopback is a documented, non-default, security-reducing deployment change. Use it only when remote reachability is intentional, keep a token set, and review the outer network boundary explicitly.
+
+If the dashboard is served over plain HTTP on a non-loopback bind, PinchTab
+shows an in-product warning because session cookies are no longer transport
+encrypted. Prefer HTTPS or localhost when possible.
+
+### Dashboard Cookie Transport
+
+`server.cookieSecure` controls whether the dashboard session cookie must use the
+`Secure` flag:
+
+- `null` / unset / `auto`: default behavior. Session cookies are `Secure` on
+  HTTPS and non-`Secure` on plain HTTP.
+- `true`: always require `Secure`. Dashboard login works only over HTTPS.
+- `false`: always omit `Secure`, even on HTTPS. Use only for operator-managed
+  edge cases.
+
+Examples:
+
+```bash
+pinchtab config set server.cookieSecure true
+pinchtab config set server.cookieSecure false
+pinchtab config set server.cookieSecure auto
+```
+
+When `server.cookieSecure = true`, plain-HTTP dashboard login fails explicitly
+with an HTTPS-required error instead of appearing to succeed and looping.
+
+If TLS terminates in front of PinchTab, also set `server.trustProxyHeaders=true`
+only when the proxy is trusted and rewrites `Forwarded` / `X-Forwarded-*`
+headers correctly.
 
 ### Custom Instance Port Range
 

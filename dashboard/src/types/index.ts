@@ -59,6 +59,7 @@ export interface BackendServerConfig {
   token: string;
   stateDir: string;
   trustProxyHeaders: boolean;
+  cookieSecure?: boolean;
 }
 
 export interface BackendDashboardSessionConfig {
@@ -213,6 +214,7 @@ export const defaultBackendConfig: BackendConfig = {
     token: "",
     stateDir: "",
     trustProxyHeaders: false,
+    cookieSecure: undefined,
   },
   browser: {
     version: "144.0.7559.133",

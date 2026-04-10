@@ -353,12 +353,12 @@ func (o *Orchestrator) Launch(name, port string, headless bool, extensionPaths [
 			ProfileID:   profileID,
 			ProfileName: name,
 			Port:        port,
-			URL:         fmt.Sprintf("http://localhost:%s", port),
+			URL:         o.childInstanceBaseURL(port),
 			Headless:    headless,
 			Status:      "starting",
 			StartTime:   time.Now(),
 		},
-		URL:     fmt.Sprintf("http://localhost:%s", port),
+		URL:     o.childInstanceBaseURL(port),
 		cdpPort: cdpPort,
 		cmd:     cmd,
 		logBuf:  logBuf,
@@ -372,6 +372,14 @@ func (o *Orchestrator) Launch(name, port string, headless bool, extensionPaths [
 	go o.monitor(inst)
 
 	return &inst.Instance, nil
+}
+
+func (o *Orchestrator) childInstanceBaseURL(port string) string {
+	host := configuredChildInstanceHost("")
+	if o != nil && o.runtimeCfg != nil {
+		host = configuredChildInstanceHost(o.runtimeCfg.Bind)
+	}
+	return httpBaseURL(host, port)
 }
 
 func (o *Orchestrator) writeChildConfig(port string, cdpPort int, profilePath, instanceStateDir string, headless bool, extensionPaths []string) (string, error) {

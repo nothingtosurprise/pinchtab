@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto/target"
-	"github.com/chromedp/chromedp"
 	"github.com/pinchtab/pinchtab/internal/bridge"
 	"github.com/pinchtab/pinchtab/internal/config"
 )
@@ -31,9 +30,8 @@ func (m *mockBridge) TabContext(tabID string) (context.Context, string, error) {
 	if m.failTab {
 		return nil, "", fmt.Errorf("tab not found")
 	}
-	// We need a context that chromedp.Run won't complain about,
-	// even if it's not fully functional for real CDP commands.
-	ctx, _ := chromedp.NewContext(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 	return ctx, "tab1", nil
 }
 
@@ -51,7 +49,8 @@ func (m *mockBridge) ExecuteAction(ctx context.Context, kind string, req bridge.
 
 func (m *mockBridge) CreateTab(url string) (string, context.Context, context.CancelFunc, error) {
 	m.createTabURLs = append(m.createTabURLs, url)
-	ctx, cancel := chromedp.NewContext(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately - no browser spawned
 	return "tab_abc12345", ctx, cancel, nil
 }
 

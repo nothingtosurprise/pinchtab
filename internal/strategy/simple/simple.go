@@ -95,7 +95,10 @@ func (s *Strategy) ensureRunning() (string, error) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		time.Sleep(500 * time.Millisecond)
-		url := fmt.Sprintf("http://localhost:%s", launched.Port)
+		url := launched.URL
+		if url == "" {
+			url = fmt.Sprintf("http://localhost:%s", launched.Port)
+		}
 		resp, healthErr := http.Get(url + "/health")
 		if healthErr == nil {
 			_ = resp.Body.Close()

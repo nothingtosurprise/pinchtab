@@ -93,6 +93,25 @@ func TestOrchestrator_ListAndStop(t *testing.T) {
 	}
 }
 
+func TestOrchestrator_Launch_UsesConfiguredBindInInstanceURL(t *testing.T) {
+	old := processAliveFunc
+	processAliveFunc = func(pid int) bool { return pid > 0 }
+	defer func() { processAliveFunc = old }()
+	stubPortAvailability(t, func(int) bool { return true })
+
+	runner := &mockRunner{portAvail: true}
+	o := NewOrchestratorWithRunner(t.TempDir(), runner)
+	o.ApplyRuntimeConfig(&config.RuntimeConfig{Bind: "192.168.1.50"})
+
+	inst, err := o.Launch("profile1", "9001", true, nil)
+	if err != nil {
+		t.Fatalf("Launch failed: %v", err)
+	}
+	if inst.URL != "http://192.168.1.50:9001" {
+		t.Fatalf("URL = %q, want %q", inst.URL, "http://192.168.1.50:9001")
+	}
+}
+
 func TestOrchestrator_StopProfile(t *testing.T) {
 	old := processAliveFunc
 	processAliveFunc = func(pid int) bool { return true }

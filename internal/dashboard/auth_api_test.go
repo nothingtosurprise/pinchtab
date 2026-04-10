@@ -15,7 +15,7 @@ func TestAuthAPIHandleLogin(t *testing.T) {
 	sessions := authn.NewSessionManager(authn.SessionConfig{})
 	api := NewAuthAPI(&config.RuntimeConfig{Token: "secret-token"}, sessions)
 
-	req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"token":"secret-token"}`))
+	req := httptest.NewRequest("POST", "https://pinchtab.example/api/auth/login", strings.NewReader(`{"token":"secret-token"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -69,6 +69,29 @@ func TestAuthAPIHandleLogin_LocalhostHTTPUsesNonSecureCookie(t *testing.T) {
 	}
 	if cookies[0].Secure {
 		t.Fatal("expected localhost http auth cookie to omit Secure so browser sessions work reliably")
+	}
+}
+
+func TestAuthAPIHandleLogin_LANHTTPUsesNonSecureCookie(t *testing.T) {
+	sessions := authn.NewSessionManager(authn.SessionConfig{})
+	api := NewAuthAPI(&config.RuntimeConfig{Token: "secret-token"}, sessions)
+
+	req := httptest.NewRequest("POST", "http://192.168.1.50:9867/api/auth/login", strings.NewReader(`{"token":"secret-token"}`))
+	req.Host = "192.168.1.50:9867"
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	api.HandleLogin(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("cookies = %d, want 1", len(cookies))
+	}
+	if cookies[0].Secure {
+		t.Fatal("expected LAN http auth cookie to omit Secure so browser sessions work reliably")
 	}
 }
 
@@ -126,6 +149,32 @@ func TestAuthAPIHandleLogin_CookieSecureFalseOverridesHTTPS(t *testing.T) {
 	}
 }
 
+func TestAuthAPIHandleLogin_CookieSecureTrueRejectsPlainHTTP(t *testing.T) {
+	sessions := authn.NewSessionManager(authn.SessionConfig{})
+	forceSecure := true
+	api := NewAuthAPI(&config.RuntimeConfig{
+		Token:        "secret-token",
+		CookieSecure: &forceSecure,
+	}, sessions)
+
+	req := httptest.NewRequest("POST", "http://192.168.1.50:9867/api/auth/login", strings.NewReader(`{"token":"secret-token"}`))
+	req.Host = "192.168.1.50:9867"
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	api.HandleLogin(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(w.Body.String(), "secure_cookie_requires_https") {
+		t.Fatalf("response = %q, want secure_cookie_requires_https error", w.Body.String())
+	}
+	if cookies := w.Result().Cookies(); len(cookies) != 0 {
+		t.Fatalf("cookies = %+v, want none", cookies)
+	}
+}
+
 func TestAuthAPIHandleLoginRejectsBadToken(t *testing.T) {
 	api := NewAuthAPI(&config.RuntimeConfig{Token: "secret-token"}, authn.NewSessionManager(authn.SessionConfig{}))
 
@@ -152,7 +201,7 @@ func TestAuthAPIHandleLogoutClearsCookie(t *testing.T) {
 	}
 	api := NewAuthAPI(&config.RuntimeConfig{Token: "secret-token"}, sessions)
 
-	req := httptest.NewRequest("POST", "/api/auth/logout", nil)
+	req := httptest.NewRequest("POST", "https://pinchtab.example/api/auth/logout", nil)
 	req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: sessionID})
 	w := httptest.NewRecorder()
 
@@ -197,6 +246,33 @@ func TestAuthAPIHandleLogout_LocalhostHTTPClearsNonSecureCookie(t *testing.T) {
 	}
 	if cookies[0].Secure {
 		t.Fatal("expected localhost http logout cookie clearing to omit Secure")
+	}
+}
+
+func TestAuthAPIHandleLogout_LANHTTPClearsNonSecureCookie(t *testing.T) {
+	sessions := authn.NewSessionManager(authn.SessionConfig{})
+	sessionID, err := sessions.Create("secret-token")
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	api := NewAuthAPI(&config.RuntimeConfig{Token: "secret-token"}, sessions)
+
+	req := httptest.NewRequest("POST", "http://192.168.1.50:9867/api/auth/logout", nil)
+	req.Host = "192.168.1.50:9867"
+	req.AddCookie(&http.Cookie{Name: authn.CookieName, Value: sessionID})
+	w := httptest.NewRecorder()
+
+	api.HandleLogout(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != authn.CookieName || cookies[0].MaxAge != -1 {
+		t.Fatalf("expected expired auth cookie, got %+v", cookies)
+	}
+	if cookies[0].Secure {
+		t.Fatal("expected LAN http logout cookie clearing to omit Secure")
 	}
 }
 

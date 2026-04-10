@@ -14,7 +14,9 @@ import * as api from "./services/api";
 import {
   AUTH_REQUIRED_EVENT,
   AUTH_STATE_CHANGED_EVENT,
+  INSECURE_DASHBOARD_TRANSPORT_WARNING,
   SERVER_UNREACHABLE_EVENT,
+  isInsecureDashboardTransport,
 } from "./services/auth";
 import { acquireDashboardRealtime } from "./services/dashboardRealtime";
 import { useAppStore } from "./stores/useAppStore";
@@ -37,6 +39,7 @@ function AppContent() {
   const [authRetryCount, setAuthRetryCount] = useState(0);
   const dashboardAccessible = authMode === "open";
   const loginRequired = authMode === "required";
+  const insecureDashboardTransport = isInsecureDashboardTransport();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-site-mode", "agent");
@@ -244,6 +247,11 @@ function AppContent() {
   return (
     <div className="dashboard-shell flex h-screen flex-col bg-bg-app">
       <NavBar showLogout={authProtected} />
+      {insecureDashboardTransport && (
+        <div className="border-b border-warning/25 bg-warning/10 px-4 py-2 text-sm text-warning">
+          {INSECURE_DASHBOARD_TRANSPORT_WARNING}
+        </div>
+      )}
       <main className="dashboard-grid flex-1 overflow-hidden">
         <Routes>
           <Route

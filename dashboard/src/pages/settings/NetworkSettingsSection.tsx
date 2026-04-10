@@ -130,6 +130,42 @@ export function NetworkSettingsSection({
         </label>
       </SettingRow>
       <SettingRow
+        label="Cookie Secure mode"
+        description="Controls whether dashboard session cookies require HTTPS. Auto enables Secure only on HTTPS. Force Secure is appropriate when TLS is in front of PinchTab."
+      >
+        <div className="space-y-2">
+          <select
+            value={
+              backendConfig.server.cookieSecure === true
+                ? "true"
+                : backendConfig.server.cookieSecure === false
+                  ? "false"
+                  : "auto"
+            }
+            onChange={(e) =>
+              updateBackendSection("server", {
+                cookieSecure:
+                  e.target.value === "auto"
+                    ? undefined
+                    : e.target.value === "true",
+              })
+            }
+            className={fieldClass}
+          >
+            <option value="auto">Auto</option>
+            <option value="true">Force Secure</option>
+            <option value="false">Force Insecure</option>
+          </select>
+          <div className="rounded-sm border border-warning/25 bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+            Force Secure blocks dashboard login on plain HTTP. Use it when
+            PinchTab is served through HTTPS directly or behind a trusted proxy.
+            If TLS terminates in front of PinchTab, enable{" "}
+            <code>trustProxyHeaders</code> so forwarded HTTPS requests are
+            recognized.
+          </div>
+        </div>
+      </SettingRow>
+      <SettingRow
         label="Persist dashboard sessions"
         description="Keep dashboard login sessions across server restarts. Disable this if you want every restart to force a fresh login."
       >
