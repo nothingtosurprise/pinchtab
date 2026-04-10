@@ -110,3 +110,57 @@ pt_post "/state/save" -d '{}'
 assert_ok "save with auto-generated name"
 
 end_test
+
+# ═══════════════════════════════════════════════════════════════════
+# Encryption tests (require security.stateEncryptionKey in config)
+# ═══════════════════════════════════════════════════════════════════
+
+ENCRYPTED_STATE_NAME="pt-e2e-encrypted-$(date +%s)"
+ENCRYPTED_STATE_CREATED=0
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /state/save with encrypt=true creates encrypted state"
+
+# This test requires stateEncryptionKey to be configured.
+# If not configured, the request will fail with 400.
+pt_post "/state/save" -d "{\"name\":\"${ENCRYPTED_STATE_NAME}\",\"encrypt\":true}"
+
+# Check if encryption key is configured
+if [ "$HTTP_STATUS" -eq 200 ]; then
+  assert_ok "save encrypted state"
+  assert_json_contains "$RESULT" '.encrypted' "true" "encrypted flag set"
+  ENCRYPTED_STATE_CREATED=1
+elif echo "$RESULT" | grep -q "encryption key"; then
+  echo -e "  ${YELLOW}⊘${NC} skipped (stateEncryptionKey not configured)"
+  ((ASSERTIONS_SKIPPED++)) || true
+else
+  assert_ok "save encrypted state"
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /state/load loads encrypted state"
+
+if [ "$ENCRYPTED_STATE_CREATED" -eq 1 ]; then
+  pt_post "/state/load" -d "{\"name\":\"${ENCRYPTED_STATE_NAME}\"}"
+  assert_ok "load encrypted state"
+else
+  echo -e "  ${YELLOW}⊘${NC} skipped (encrypted state not created)"
+  ((ASSERTIONS_SKIPPED++)) || true
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "DELETE /state cleans up encrypted state"
+
+if [ "$ENCRYPTED_STATE_CREATED" -eq 1 ]; then
+  pt_delete "/state?name=${ENCRYPTED_STATE_NAME}"
+  assert_ok "delete encrypted state"
+else
+  echo -e "  ${YELLOW}⊘${NC} skipped"
+  ((ASSERTIONS_SKIPPED++)) || true
+fi
+
+end_test

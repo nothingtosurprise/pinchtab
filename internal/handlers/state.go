@@ -21,9 +21,17 @@ func (h *Handlers) stateExportEnabled() bool {
 }
 
 // HandleStateList lists all saved state files.
+// Gated behind CapStateExport (security.allowStateExport).
 //
 // @Endpoint GET /state/list
 func (h *Handlers) HandleStateList(w http.ResponseWriter, r *http.Request) {
+	if !h.stateExportEnabled() {
+		httpx.ErrorCode(w, 403, "state_export_disabled", httpx.DisabledEndpointMessage("stateExport", "security.allowStateExport"), false, map[string]any{
+			"setting": "security.allowStateExport",
+		})
+		return
+	}
+
 	entries, err := state.List(h.Config.StateDir)
 	if err != nil {
 		httpx.Error(w, 500, fmt.Errorf("list states: %w", err))
@@ -54,7 +62,7 @@ func (h *Handlers) HandleStateShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encryptionKey := os.Getenv("PINCHTAB_STATE_KEY")
+	encryptionKey := h.Config.StateEncryptionKey
 	path := state.ResolvePath(h.Config.StateDir, name)
 
 	sf, err := state.Load(path, encryptionKey)
@@ -94,9 +102,9 @@ func (h *Handlers) HandleStateSave(w http.ResponseWriter, r *http.Request) {
 
 	encryptionKey := ""
 	if req.Encrypt {
-		encryptionKey = os.Getenv("PINCHTAB_STATE_KEY")
+		encryptionKey = h.Config.StateEncryptionKey
 		if err := state.ValidateEncryptionKey(encryptionKey); err != nil {
-			httpx.Error(w, 400, fmt.Errorf("encryption key required: set PINCHTAB_STATE_KEY environment variable"))
+			httpx.Error(w, 400, fmt.Errorf("encryption key required: set security.stateEncryptionKey in config"))
 			return
 		}
 	}
@@ -279,7 +287,7 @@ func (h *Handlers) HandleStateLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encryptionKey := os.Getenv("PINCHTAB_STATE_KEY")
+	encryptionKey := h.Config.StateEncryptionKey
 	path := state.ResolvePath(h.Config.StateDir, req.Name)
 
 	// ResolvePath returns a constructed path even when the file doesn't exist

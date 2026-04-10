@@ -113,8 +113,8 @@ var coreEndpoints = []Endpoint{
 	{"POST", "/storage", "Set storage item", CapStateExport, true},
 	{"DELETE", "/storage", "Delete storage items", CapStateExport, true},
 
-	// State management — list is read-only summary, ungated.
-	{"GET", "/state/list", "List saved states", CapNone, false},
+	// State management
+	{"GET", "/state/list", "List saved states", CapStateExport, false},
 
 	// Capability-gated
 	{"POST", "/evaluate", "Run JavaScript in page", CapEvaluate, true},

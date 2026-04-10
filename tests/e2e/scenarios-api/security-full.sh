@@ -80,3 +80,43 @@ assert_json_exists "$RESULT" ".code" "has error code"
 assert_json_exists "$RESULT" ".error" "has error message"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "security: stateExport BLOCKED when disabled"
+
+secure_get /state/list
+assert_http_status 403 "state list blocked"
+assert_contains "$RESULT" "state_export_disabled" "correct error code"
+
+secure_get /storage
+assert_http_status 403 "storage get blocked"
+assert_contains "$RESULT" "state_export_disabled" "correct error code"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "security: state save/load BLOCKED when disabled"
+
+secure_post /state/save -d '{"name":"test-blocked"}'
+assert_http_status 403 "state save blocked"
+assert_contains "$RESULT" "state_export_disabled" "correct error code"
+
+secure_post /state/load -d '{"name":"test-blocked"}'
+assert_http_status 403 "state load blocked"
+assert_contains "$RESULT" "state_export_disabled" "correct error code"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "security: tab-scoped storage BLOCKED when stateExport disabled"
+
+secure_get "/tabs"
+TAB_ID=$(echo "$RESULT" | jq -r '.tabs[0].id // empty')
+
+if [ -n "$TAB_ID" ]; then
+  secure_get "/tabs/${TAB_ID}/storage"
+  assert_http_status 403 "tab storage blocked"
+  assert_contains "$RESULT" "state_export_disabled" "correct error code"
+fi
+
+end_test

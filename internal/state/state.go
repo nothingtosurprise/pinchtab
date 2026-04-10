@@ -389,7 +389,7 @@ func decryptWithKey(ciphertext, key []byte) ([]byte, error) {
 // ValidateEncryptionKey checks that the key is non-empty.
 func ValidateEncryptionKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("PINCHTAB_STATE_KEY must be set for encrypted state operations")
+		return fmt.Errorf("security.stateEncryptionKey must be set for encrypted state operations")
 	}
 	return nil
 }

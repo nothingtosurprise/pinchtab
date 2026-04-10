@@ -34,3 +34,27 @@ pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/index.html\"}"
 assert_ok "navigate to allowed domain"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "security: stateExport ALLOWED when enabled"
+
+pt_get /state/list
+assert_ok "state list allowed"
+
+pt_get /storage
+assert_ok "storage get allowed"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "security: tab-scoped storage ALLOWED when stateExport enabled"
+
+pt_get "/tabs"
+TAB_ID=$(echo "$RESULT" | jq -r '.tabs[0].id // empty')
+
+if [ -n "$TAB_ID" ]; then
+  pt_get "/tabs/${TAB_ID}/storage"
+  assert_ok "tab storage get allowed"
+fi
+
+end_test

@@ -89,8 +89,29 @@ func (h *Handlers) HandleOpenAPI(w http.ResponseWriter, _ *http.Request) {
 					"x-pinchtab-enabled": security["stateExport"].Enabled,
 				},
 			},
-			"/state/list": map[string]any{"get": map[string]any{"summary": "List saved state files"}},
+			"/tabs/{id}/storage": map[string]any{
+				"get": map[string]any{
+					"summary":            "Get localStorage/sessionStorage items for a specific tab",
+					"description":        security["stateExport"].Message,
+					"x-pinchtab-enabled": security["stateExport"].Enabled,
+				},
+				"post": map[string]any{
+					"summary":            "Set a storage item for a specific tab",
+					"description":        security["stateExport"].Message,
+					"x-pinchtab-enabled": security["stateExport"].Enabled,
+				},
+				"delete": map[string]any{
+					"summary":            "Delete storage items for a specific tab",
+					"description":        security["stateExport"].Message,
+					"x-pinchtab-enabled": security["stateExport"].Enabled,
+				},
+			},
 			// CapStateExport-gated endpoints
+			"/state/list": map[string]any{"get": map[string]any{
+				"summary":            "List saved state files",
+				"description":        security["stateExport"].Message,
+				"x-pinchtab-enabled": security["stateExport"].Enabled,
+			}},
 			"/state/show": map[string]any{"get": map[string]any{
 				"summary":            "Show state file details",
 				"description":        security["stateExport"].Message,

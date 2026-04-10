@@ -293,9 +293,9 @@ State management saves and restores browser state (cookies, localStorage, sessio
 
 Notes:
 
-- `/storage`, `/tabs/{id}/storage`, `GET /state/show`, `POST /state/save`, `POST /state/load`, `DELETE /state`, and `POST /state/clean` are gated by `security.allowStateExport`
+- All state and storage endpoints are gated by `security.allowStateExport`: `/storage`, `/tabs/{id}/storage`, `GET /state/list`, `GET /state/show`, `POST /state/save`, `POST /state/load`, `DELETE /state`, and `POST /state/clean`
 - state files are stored in `{stateDir}/sessions/` with `0600` permissions
-- optional AES-256-GCM encryption via `PINCHTAB_STATE_KEY` environment variable
+- optional AES-256-GCM encryption via `security.stateEncryptionKey` config setting
 - storage is captured only for the current origin (active tab)
 
 `POST /state/save` body fields:
@@ -510,7 +510,7 @@ These gates are not ordinary feature toggles. Enabling them is a documented, non
 - clipboard routes -> `security.allowClipboard`
 - attach routes -> `security.attach`
 - screencast routes -> `security.allowScreencast`
-- storage routes and the full state-management family (`/state/show`, `/state/save`, `/state/load`, `DELETE /state`, `POST /state/clean`) -> `security.allowStateExport`
+- storage routes (`/storage`, `/tabs/{id}/storage`) and the full state-management family (`/state/list`, `/state/show`, `/state/save`, `/state/load`, `DELETE /state`, `POST /state/clean`) -> `security.allowStateExport`
 
 ## Error Response Format
 

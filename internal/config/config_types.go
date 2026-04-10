@@ -27,7 +27,8 @@ type RuntimeConfig struct {
 	AllowUpload            bool
 	AllowClipboard         bool
 	AllowStateExport       bool
-	EnableActionGuards     bool // Enable bridge-level stale/navigation guard checks around actions
+	StateEncryptionKey     string // Key for encrypting state files (AES-256-GCM)
+	EnableActionGuards     bool   // Enable bridge-level stale/navigation guard checks around actions
 	UploadMaxRequestBytes  int
 	UploadMaxFiles         int
 	UploadMaxFileBytes     int
@@ -273,6 +274,7 @@ type SecurityConfig struct {
 	AllowUpload            *bool        `json:"allowUpload,omitempty"`
 	AllowClipboard         *bool        `json:"allowClipboard,omitempty"`
 	AllowStateExport       *bool        `json:"allowStateExport,omitempty"`
+	StateEncryptionKey     *string      `json:"stateEncryptionKey,omitempty"`
 	EnableActionGuards     *bool        `json:"enableActionGuards,omitempty"`
 	UploadMaxRequestBytes  *int         `json:"uploadMaxRequestBytes,omitempty"`
 	UploadMaxFiles         *int         `json:"uploadMaxFiles,omitempty"`

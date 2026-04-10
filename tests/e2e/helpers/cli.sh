@@ -38,7 +38,7 @@ pt() {
   rm -f "$tmpout" "$tmperr"
 
   if [ -n "$PT_OUT" ]; then
-    echo "$PT_OUT" | head -5
+    head -5 <<< "$PT_OUT" || true
   fi
 }
 

@@ -6,6 +6,18 @@
 GROUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${GROUP_DIR}/../helpers/api.sh"
 
+# ═══════════════════════════════════════════════════════════════════
+# Setup: Navigate to a fixture page so storage has a valid origin
+# ═══════════════════════════════════════════════════════════════════
+
+start_test "Setup: navigate to fixture page for storage tests"
+
+pt_post /navigate "{\"url\":\"${FIXTURES_URL}/index.html\"}"
+assert_ok "navigate to fixture"
+sleep 0.5
+
+end_test
+
 # ─────────────────────────────────────────────────────────────────
 start_test "POST /storage sets a localStorage item"
 
@@ -89,5 +101,57 @@ start_test "GET /storage returns 403 when allowStateExport=false"
 
 # This test is advisory — only run when storage gate is disabled.
 # The assertion is informational; actual gate test is in security-basic.sh.
+
+end_test
+
+# ═══════════════════════════════════════════════════════════════════
+# Tab-scoped storage tests
+# ═══════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────
+start_test "GET /tabs/{id}/storage reads storage for specific tab"
+
+# Get the active tab ID first
+pt_get "/tabs"
+assert_ok "get tabs"
+TAB_ID=$(echo "$RESULT" | jq -r '.tabs[0].id // empty')
+
+if [ -n "$TAB_ID" ]; then
+  pt_get "/tabs/${TAB_ID}/storage"
+  assert_ok "get tab storage"
+  assert_json_exists "$RESULT" '.origin' "has origin field"
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /tabs/{id}/storage sets storage for specific tab"
+
+if [ -n "$TAB_ID" ]; then
+  pt_post "/tabs/${TAB_ID}/storage" -d '{"key":"pt_tab_key","value":"pt_tab_value","type":"local"}'
+  assert_ok "set tab localStorage item"
+  assert_json_exists "$RESULT" '.success' "has success field"
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "DELETE /tabs/{id}/storage deletes storage for specific tab"
+
+if [ -n "$TAB_ID" ]; then
+  pt_delete "/tabs/${TAB_ID}/storage" -d '{"key":"pt_tab_key","type":"local"}'
+  assert_ok "delete tab localStorage key"
+  assert_json_exists "$RESULT" '.success' "has success field"
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /tabs/{id}/storage rejects mismatched tabId in body"
+
+if [ -n "$TAB_ID" ]; then
+  pt_post "/tabs/${TAB_ID}/storage" -d '{"tabId":"wrong_tab_id","key":"k","value":"v","type":"local"}'
+  assert_not_ok "rejects tabId mismatch"
+fi
 
 end_test

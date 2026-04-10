@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -409,4 +411,111 @@ func buildStorageDeleteScript(storageType, key string) string {
 			}
 		})()
 	`, storageObj)
+}
+
+// HandleTabStorageGet retrieves storage items for a tab identified by path ID.
+//
+// @Endpoint GET /tabs/{id}/storage
+func (h *Handlers) HandleTabStorageGet(w http.ResponseWriter, r *http.Request) {
+	tabID := r.PathValue("id")
+	if tabID == "" {
+		httpx.Error(w, 400, fmt.Errorf("tab id required"))
+		return
+	}
+
+	q := r.URL.Query()
+	q.Set("tabId", tabID)
+
+	req := r.Clone(r.Context())
+	u := *r.URL
+	u.RawQuery = q.Encode()
+	req.URL = &u
+
+	h.handleStorageGet(w, req)
+}
+
+// HandleTabStorageSet sets a storage item for a tab identified by path ID.
+//
+// @Endpoint POST /tabs/{id}/storage
+func (h *Handlers) HandleTabStorageSet(w http.ResponseWriter, r *http.Request) {
+	tabID := r.PathValue("id")
+	if tabID == "" {
+		httpx.Error(w, 400, fmt.Errorf("tab id required"))
+		return
+	}
+
+	body := map[string]any{}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize))
+	if err := dec.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		httpx.Error(w, 400, fmt.Errorf("decode: %w", err))
+		return
+	}
+
+	if rawTabID, ok := body["tabId"]; ok {
+		if provided, ok := rawTabID.(string); !ok || provided == "" {
+			httpx.Error(w, 400, fmt.Errorf("invalid tabId"))
+			return
+		} else if provided != tabID {
+			httpx.Error(w, 400, fmt.Errorf("tabId in body does not match path id"))
+			return
+		}
+	}
+
+	body["tabId"] = tabID
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		httpx.Error(w, 500, fmt.Errorf("encode: %w", err))
+		return
+	}
+
+	req := r.Clone(r.Context())
+	req.Body = io.NopCloser(bytes.NewReader(payload))
+	req.ContentLength = int64(len(payload))
+	req.Header = r.Header.Clone()
+	req.Header.Set("Content-Type", "application/json")
+	h.handleStorageSet(w, req)
+}
+
+// HandleTabStorageDelete deletes storage items for a tab identified by path ID.
+//
+// @Endpoint DELETE /tabs/{id}/storage
+func (h *Handlers) HandleTabStorageDelete(w http.ResponseWriter, r *http.Request) {
+	tabID := r.PathValue("id")
+	if tabID == "" {
+		httpx.Error(w, 400, fmt.Errorf("tab id required"))
+		return
+	}
+
+	body := map[string]any{}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize))
+	if err := dec.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		httpx.Error(w, 400, fmt.Errorf("decode: %w", err))
+		return
+	}
+
+	if rawTabID, ok := body["tabId"]; ok {
+		if provided, ok := rawTabID.(string); !ok || provided == "" {
+			httpx.Error(w, 400, fmt.Errorf("invalid tabId"))
+			return
+		} else if provided != tabID {
+			httpx.Error(w, 400, fmt.Errorf("tabId in body does not match path id"))
+			return
+		}
+	}
+
+	body["tabId"] = tabID
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		httpx.Error(w, 500, fmt.Errorf("encode: %w", err))
+		return
+	}
+
+	req := r.Clone(r.Context())
+	req.Body = io.NopCloser(bytes.NewReader(payload))
+	req.ContentLength = int64(len(payload))
+	req.Header = r.Header.Clone()
+	req.Header.Set("Content-Type", "application/json")
+	h.handleStorageDelete(w, req)
 }

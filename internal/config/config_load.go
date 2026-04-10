@@ -30,6 +30,7 @@ func Load() *RuntimeConfig {
 		AllowUpload:            false,
 		AllowClipboard:         false,
 		AllowStateExport:       false,
+		StateEncryptionKey:     "",
 		EnableActionGuards:     true,
 		UploadMaxRequestBytes:  DefaultUploadMaxRequestBytes,
 		UploadMaxFiles:         DefaultUploadMaxFiles,
@@ -246,6 +247,9 @@ func applyFileConfig(cfg *RuntimeConfig, fc *FileConfig) {
 	}
 	if fc.Security.AllowStateExport != nil {
 		cfg.AllowStateExport = *fc.Security.AllowStateExport
+	}
+	if fc.Security.StateEncryptionKey != nil {
+		cfg.StateEncryptionKey = *fc.Security.StateEncryptionKey
 	}
 	if fc.Security.EnableActionGuards != nil {
 		cfg.EnableActionGuards = *fc.Security.EnableActionGuards

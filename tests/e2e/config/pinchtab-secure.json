@@ -22,7 +22,7 @@
     "allowEvaluate": false,
     "allowDownload": false,
     "allowUpload": false,
-    "allowStateExport": true,
+    "allowStateExport": false,
     "allowedDomains": [
       "internal-test.invalid",
       "fixtures"

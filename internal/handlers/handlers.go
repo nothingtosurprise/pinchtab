@@ -232,6 +232,9 @@ func (h *Handlers) RegisterRoutes(mux *http.ServeMux, doShutdown func()) {
 	mux.HandleFunc("GET /storage", h.HandleStorage)
 	mux.HandleFunc("POST /storage", h.HandleStorage)
 	mux.HandleFunc("DELETE /storage", h.HandleStorage)
+	mux.HandleFunc("GET /tabs/{id}/storage", h.HandleTabStorageGet)
+	mux.HandleFunc("POST /tabs/{id}/storage", h.HandleTabStorageSet)
+	mux.HandleFunc("DELETE /tabs/{id}/storage", h.HandleTabStorageDelete)
 
 	// State management
 	mux.HandleFunc("GET /state/list", h.HandleStateList)
