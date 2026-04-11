@@ -145,6 +145,13 @@ func (b *Bridge) actionScroll(ctx context.Context, req ActionRequest) (map[strin
 	if req.NodeID > 0 {
 		return map[string]any{"scrolled": true}, ScrollByNodeID(ctx, req.NodeID)
 	}
+	if req.Selector != "" {
+		node, err := firstNodeBySelector(ctx, req.Selector)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"scrolled": true}, ScrollByNodeID(ctx, int64(node.BackendNodeID))
+	}
 
 	scrollX := req.ScrollX
 	scrollY := req.ScrollY

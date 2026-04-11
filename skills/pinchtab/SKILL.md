@@ -224,6 +224,8 @@ Rules:
 - Re-snapshot immediately after `click`, `press Enter`, `select`, or `scroll` if the UI can change.
 - To discover valid dropdown values, snapshot with `filter=interactive` first — the output shows `<option>` elements with their `value` attributes. Then use `select` with the exact value.
 - If a click opens a JS dialog (`alert`, `confirm`, `prompt`), pass `"dialogAction": "accept"` or `"dialogAction": "dismiss"` on the click action body. The dialog is auto-handled in a single call. Without this, the click hangs until `/tabs/TAB_ID/dialog` is called from a parallel request, and a pending dialog wedges subsequent `/snapshot` and `/text` calls.
+- For the `scroll` action via HTTP, use `"scrollX"` / `"scrollY"` for pixel deltas, or `"selector"` to scroll an element into view. Example: `{"kind":"scroll","scrollY":1500}` or `{"kind":"scroll","selector":"#footer"}`. The `x`/`y` fields are target viewport coordinates, not scroll deltas.
+- The download HTTP endpoint (`GET /download?url=...` or `GET /tabs/TAB_ID/download?url=...`) returns JSON `{contentType, data (base64), size, url}`, not raw bytes. Decode `data` with base64 to get the file. Only `http`/`https` URLs are allowed. Private/internal hosts are blocked unless listed in `security.downloadAllowedDomains`.
 
 ### Export, debug, and verification
 
