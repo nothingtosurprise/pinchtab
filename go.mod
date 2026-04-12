@@ -9,7 +9,7 @@ require (
 	github.com/gost-dom/browser v0.11.0
 	github.com/mark3labs/mcp-go v0.45.0
 	github.com/pinchtab/idpishield v0.1.3
-	github.com/pinchtab/semantic v0.1.0
+	github.com/pinchtab/semantic v0.1.1
 	github.com/shirou/gopsutil/v4 v4.26.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.47.0
