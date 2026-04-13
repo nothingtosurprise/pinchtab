@@ -69,7 +69,7 @@ func (l *LiteEngine) Navigate(ctx context.Context, url string) (*NavigateResult,
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; PinchTab-Lite/1.0)")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,*/*")
 
-	resp, err := l.client.Do(req)
+	resp, err := l.clientForNavigate(ctx).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("lite navigate fetch: %w", err)
 	}

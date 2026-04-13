@@ -216,6 +216,16 @@ assert_ok "lite text passes"
 
 end_test
 
+# ─────────────────────────────────────────────────────────────────
+start_test "safe-lite: redirects to internal targets are blocked"
+
+ATTACKER_URL="https://httpbin.org/redirect-to?url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2F"
+lite_post /navigate "{\"url\":\"${ATTACKER_URL}\"}"
+assert_http_status 403 "lite redirect to internal blocked"
+assert_contains "$RESULT" "blocked\|private\|internal" "lite SSRF block message returned"
+
+end_test
+
 # ═══════════════════════════════════════════════════════════════════
 # PART 4: SafeEngine IDPI strict — secure server (chrome engine)
 # ═══════════════════════════════════════════════════════════════════

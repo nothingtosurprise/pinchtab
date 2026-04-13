@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -115,9 +116,21 @@ func (h *Handlers) HandleNavigate(w http.ResponseWriter, r *http.Request) {
 	// --- Lite engine fast path ---
 	if h.useLite(engine.CapNavigate, req.URL) {
 		h.recordEngine(r, "lite")
-		result, err := h.Router.Lite().Navigate(r.Context(), req.URL)
+		var trustedResolvedIP []netip.Addr
+		allowInternal := false
+		if target != nil {
+			trustedResolvedIP = target.trustedResolvedIP
+			allowInternal = target.allowInternal
+		}
+		liteCtx := engine.WithNavigateNetworkPolicy(r.Context(), &engine.NavigateNetworkPolicy{
+			AllowInternal:     allowInternal,
+			TrustedProxyCIDRs: trustedCIDRs,
+			TrustedResolvedIP: trustedResolvedIP,
+			MaxRedirects:      h.Config.MaxRedirects,
+		})
+		result, err := h.Router.Lite().Navigate(liteCtx, req.URL)
 		if err != nil {
-			if engine.IsIDPIBlocked(err) {
+			if engine.IsIDPIBlocked(err) || engine.IsNetworkPolicyBlocked(err) {
 				httpx.Error(w, http.StatusForbidden, err)
 			} else {
 				httpx.Error(w, 502, fmt.Errorf("lite navigate: %w", err))

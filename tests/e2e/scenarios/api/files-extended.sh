@@ -190,3 +190,13 @@ assert_http_status 400 "redirected internal target blocked"
 assert_contains "$RESULT" "unsafe browser request\|blocked\|private" "redirect SSRF error message"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "download fallback: gzip download path still succeeds"
+
+pt_get "/download?url=${FIXTURES_URL}/sitemap.xml.gz"
+assert_ok "gzip fallback download"
+assert_json_eq "$RESULT" '.contentType' 'application/xml' "gzip fallback reports decompressed XML content type"
+assert_json_jq "$RESULT" '.size > 0' "gzip fallback returns non-empty body" "gzip fallback body was empty"
+
+end_test

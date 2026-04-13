@@ -43,6 +43,17 @@ func newDownloadURLGuard(allowedDomains []string) *downloadURLGuard {
 	return &downloadURLGuard{allowedDomains: append([]string(nil), allowedDomains...)}
 }
 
+func (g *downloadURLGuard) isHostAllowed(host string) bool {
+	if len(g.allowedDomains) == 0 {
+		return false
+	}
+	host = netguard.NormalizeHost(host)
+	if host == "" {
+		return false
+	}
+	return g.isDomainAllowed("https://" + host)
+}
+
 // isDomainAllowed reports whether rawURL's domain is on the configured
 // allowlist. Allowlisted domains bypass private-IP checks because they
 // are explicitly trusted by the operator (e.g. internal docker hosts).
@@ -451,7 +462,7 @@ func (h *Handlers) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		// Fall back to a direct Go HTTP fetch using the browser's cookies.
 		if isNavigationAborted(err) {
 			slog.Info("download: Chrome navigation aborted, falling back to direct fetch", "url", dlURL)
-			body, mime, status, fetchErr := h.fetchDirectWithCookies(tCtx, browserCtx, dlURL, maxDownloadBytes)
+			body, mime, status, fetchErr := h.fetchDirectWithCookies(tCtx, browserCtx, dlURL, validator, maxDownloadBytes)
 			if fetchErr != nil {
 				// Return 400 for redirect-blocked errors (SSRF protection)
 				errMsg := fetchErr.Error()
@@ -583,7 +594,7 @@ func (h *Handlers) writeDownloadResponse(w http.ResponseWriter, body []byte, mim
 
 // fetchDirectWithCookies performs a Go HTTP fetch with browser cookies.
 // Fallback for when Chrome navigation aborts (e.g. .gz files).
-func (h *Handlers) fetchDirectWithCookies(ctx context.Context, browserCtx context.Context, dlURL string, maxBytes int) (body []byte, contentType string, statusCode int, err error) {
+func (h *Handlers) fetchDirectWithCookies(ctx context.Context, browserCtx context.Context, dlURL string, validator *downloadURLGuard, maxBytes int) (body []byte, contentType string, statusCode int, err error) {
 	var browserCookies []*network.Cookie
 	if fetchErr := chromedp.Run(browserCtx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -608,22 +619,7 @@ func (h *Handlers) fetchDirectWithCookies(ctx context.Context, browserCtx contex
 		req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("too many redirects")
-			}
-			host := req.URL.Hostname()
-			if netguard.IsLocalHost(host) {
-				return fmt.Errorf("redirect to local network blocked: %s", host)
-			}
-			if _, err := netguard.ResolveAndValidatePublicIPs(req.Context(), host); err != nil {
-				return fmt.Errorf("redirect to private network blocked: %s", host)
-			}
-			return nil
-		},
-	}
+	client := newGuardedDownloadClient(validator, h.Config.MaxRedirects, 30)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", 0, err
