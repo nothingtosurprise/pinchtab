@@ -254,6 +254,23 @@ func TestOpenAPIIncludesEvaluateAwaitPromiseSchema(t *testing.T) {
 	}
 }
 
+func TestHandleTabMetricsReturns404ForUnknownTab(t *testing.T) {
+	h := New(&mockBridge{failTab: true}, &config.RuntimeConfig{}, nil, nil, nil)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux, nil)
+
+	req := httptest.NewRequest("GET", "/tabs/invalid_tab_id/metrics", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 from /tabs/{id}/metrics for unknown tab, got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tab not found") {
+		t.Fatalf("expected not-found response body, got %q", w.Body.String())
+	}
+}
+
 func TestHandleNavigate(t *testing.T) {
 	stubNavigateHostResolution(t, func(context.Context, string, string) ([]net.IP, error) {
 		return []net.IP{net.ParseIP("93.184.216.34")}, nil

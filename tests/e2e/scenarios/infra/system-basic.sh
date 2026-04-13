@@ -251,55 +251,20 @@ fi
 
 end_test
 
-# --- T2: Instance start with extension via API ---
-start_test "Extension config: instance start accepts extensionPaths"
+# --- T2: Instance start rejects request-level extension injection ---
+start_test "Extension config: instance start rejects extensionPaths"
 
 pt_post /instances/start '{"extensionPaths":["/extensions/test-extension"]}'
-assert_ok "instance start with extension"
-INST_ID=$(echo "$RESULT" | jq -r '.id')
-INST_PORT=$(echo "$RESULT" | jq -r '.port')
-E2E_SERVER="http://pinchtab:${INST_PORT}"
-wait_for_instance_ready "${E2E_SERVER}"
-E2E_SERVER=$ORIG_URL
-
-assert_instance_logs_poll_all \
-  "$INST_ID" \
-  "API-started instance logs extension path" \
-  "loading extensions" \
-  "paths=/extensions/test-extension"
+assert_not_ok "instance start rejects extensionPaths"
+assert_contains "$RESULT" "extensionPaths are not supported" "extensionPaths rejection message"
 
 end_test
 
-# --- T3: Global + API injected extensions (Additive) ---
-start_test "Additive extensions: global + API paths merged"
+# --- T3: Launch alias also rejects request-level extension injection ---
+start_test "Extension config: launch alias rejects extensionPaths"
 
-pt_post /instances/start '{"extensionPaths":["/extensions/test-extension-api"]}'
-assert_ok "instance start"
-INST_ID=$(echo "$RESULT" | jq -r '.id')
-INST_PORT=$(echo "$RESULT" | jq -r '.port')
-
-E2E_SERVER="http://pinchtab:${INST_PORT}"
-
-wait_for_instance_ready "${E2E_SERVER}"
-
-pt_post /navigate "{\"url\":\"${FIXTURES_URL}/index.html\"}"
-assert_ok "navigate"
-assert_instance_logs_poll_all \
-  "$INST_ID" \
-  "child instance logs merged extension paths" \
-  "loading extensions" \
-  "paths=/extensions/test-extension,/extensions/test-extension-api"
-MERGE_PASS=$?
-
-assert_instance_logs_poll \
-  "$INST_ID" \
-  "chrome initialized successfully" \
-  "child instance chrome initialized"
-
-if [ $MERGE_PASS -ne 0 ]; then
-  print_extension_hints "$INST_ID"
-fi
-
-E2E_SERVER=$ORIG_URL
+pt_post /instances/launch '{"extensionPaths":["/extensions/test-extension-api"]}'
+assert_not_ok "launch rejects extensionPaths"
+assert_contains "$RESULT" "extensionPaths are not supported" "launch rejection message"
 
 end_test

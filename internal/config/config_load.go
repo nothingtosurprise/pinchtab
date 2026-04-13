@@ -54,7 +54,7 @@ func Load() *RuntimeConfig {
 		MaxParallelTabs:   0,
 		ChromeBinary:      "", // Set via config.json only
 		ChromeExtraFlags:  "",
-		ExtensionPaths:    nil,
+		ExtensionPaths:    []string{defaultExtensionsDir(userConfigDir())},
 		UserAgent:         "",
 		NoAnimations:      false,
 		StealthLevel:      "light",
@@ -355,8 +355,8 @@ func applyFileConfig(cfg *RuntimeConfig, fc *FileConfig) {
 	if fc.Browser.ChromeExtraFlags != "" {
 		cfg.ChromeExtraFlags = SanitizeChromeExtraFlags(fc.Browser.ChromeExtraFlags)
 	}
-	if len(fc.Browser.ExtensionPaths) > 0 {
-		cfg.ExtensionPaths = fc.Browser.ExtensionPaths
+	if fc.Browser.ExtensionPaths != nil {
+		cfg.ExtensionPaths = append([]string(nil), fc.Browser.ExtensionPaths...)
 	}
 
 	// Instance defaults

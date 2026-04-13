@@ -28,6 +28,10 @@ func TestDefaultFileConfig(t *testing.T) {
 	if fc.Security.Attach.Enabled == nil || *fc.Security.Attach.Enabled {
 		t.Errorf("DefaultFileConfig.Security.Attach.Enabled = %v, want explicit false", formatBoolPtr(fc.Security.Attach.Enabled))
 	}
+	wantExtensionsDir := defaultExtensionsDir(userConfigDir())
+	if len(fc.Browser.ExtensionPaths) != 1 || fc.Browser.ExtensionPaths[0] != wantExtensionsDir {
+		t.Errorf("DefaultFileConfig.Browser.ExtensionPaths = %v, want [%q]", fc.Browser.ExtensionPaths, wantExtensionsDir)
+	}
 	if fc.Security.AllowEvaluate == nil || *fc.Security.AllowEvaluate {
 		t.Errorf("DefaultFileConfig.Security.AllowEvaluate = %v, want explicit false", formatBoolPtr(fc.Security.AllowEvaluate))
 	}
@@ -213,6 +217,10 @@ func TestDefaultFileConfigJSON(t *testing.T) {
 	}
 	if parsed.Security.AllowEvaluate == nil || *parsed.Security.AllowEvaluate {
 		t.Errorf("round-trip Security.AllowEvaluate = %v, want explicit false", formatBoolPtr(parsed.Security.AllowEvaluate))
+	}
+	wantExtensionsDir := defaultExtensionsDir(userConfigDir())
+	if len(parsed.Browser.ExtensionPaths) != 1 || parsed.Browser.ExtensionPaths[0] != wantExtensionsDir {
+		t.Errorf("round-trip Browser.ExtensionPaths = %v, want [%q]", parsed.Browser.ExtensionPaths, wantExtensionsDir)
 	}
 	if parsed.Security.AllowMacro == nil || *parsed.Security.AllowMacro {
 		t.Errorf("round-trip Security.AllowMacro = %v, want explicit false", formatBoolPtr(parsed.Security.AllowMacro))

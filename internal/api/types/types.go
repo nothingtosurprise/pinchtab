@@ -180,9 +180,7 @@ type InstanceMetrics struct {
 
 // LaunchInstanceRequest is the request body for launching an instance.
 type LaunchInstanceRequest struct {
-	ProfileID      string   `json:"profileId,omitempty"`      // profile ID (prof_XXXXXXXX)
-	Name           string   `json:"name,omitempty"`           // profile name
-	Mode           string   `json:"mode,omitempty"`           // "headed" or empty for headless
-	Port           string   `json:"port,omitempty"`           // port number as string
-	ExtensionPaths []string `json:"extensionPaths,omitempty"` // Chrome extension paths to load
+	ProfileID string `json:"profileId,omitempty"` // profile ID (prof_XXXXXXXX) or existing profile name
+	Mode      string `json:"mode,omitempty"`      // "headed" or empty for headless
+	Port      string `json:"port,omitempty"`      // port number as string
 }

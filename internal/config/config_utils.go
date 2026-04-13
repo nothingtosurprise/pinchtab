@@ -59,6 +59,13 @@ func DefaultConfigPath() string {
 	return filepath.Join(userConfigDir(), "config.json")
 }
 
+func defaultExtensionsDir(baseDir string) string {
+	if strings.TrimSpace(baseDir) == "" {
+		baseDir = userConfigDir()
+	}
+	return filepath.Join(baseDir, "extensions")
+}
+
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {

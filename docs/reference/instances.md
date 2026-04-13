@@ -56,13 +56,13 @@ Request body:
 - `profileId`: optional; accepts a profile ID or an existing profile name
 - `mode`: optional; use `headed` for a visible browser, anything else is treated as headless
 - `port`: optional
-- `extensionPaths`: optional array of extension paths
 
 Notes:
 
 - if `profileId` is omitted, PinchTab creates an auto-generated temporary profile
 - if `port` is omitted, PinchTab allocates one from the configured instance port range
 - the CLI flag is `--profile`, even though the API field is `profileId`
+- request-supplied extension paths are rejected; configure `browser.extensionPaths` on the server instead. By default, PinchTab uses the local `extensions/` directory under its state/config folder.
 
 ### `POST /instances/launch`
 
@@ -79,12 +79,12 @@ Request body:
 - `profileId`: optional existing profile ID or existing profile name
 - `mode`: optional; `headed` or headless by default
 - `port`: optional
-- `extensionPaths`: optional array of extension paths
 
 Important:
 
 - `/instances/launch` does not read a `headless` field. Use `mode:"headed"` when you want a headed browser.
 - `name` is no longer supported on `/instances/launch`. Create the profile first via `POST /profiles`, then use the returned `id` as `profileId`.
+- request-supplied extension paths are rejected; configure `browser.extensionPaths` on the server instead. By default, PinchTab uses the local `extensions/` directory under its state/config folder.
 
 ## Get One Instance
 

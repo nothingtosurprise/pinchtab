@@ -49,6 +49,10 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.CookieSecure != nil {
 		t.Errorf("default CookieSecure = %v, want nil for auto-detect", *cfg.CookieSecure)
 	}
+	wantExtensionsDir := defaultExtensionsDir(userConfigDir())
+	if len(cfg.ExtensionPaths) != 1 || cfg.ExtensionPaths[0] != wantExtensionsDir {
+		t.Errorf("default ExtensionPaths = %v, want [%q]", cfg.ExtensionPaths, wantExtensionsDir)
+	}
 	if len(cfg.DownloadAllowedDomains) != 0 {
 		t.Errorf("default DownloadAllowedDomains = %v, want empty list", cfg.DownloadAllowedDomains)
 	}
@@ -468,6 +472,24 @@ func TestApplyFileConfigToRuntime_CopiesDownloadAllowedDomains(t *testing.T) {
 	}
 	if cfg.DownloadAllowedDomains[0] != "pinchtab.com" {
 		t.Fatalf("ApplyFileConfigToRuntime copied list = %v, want original values", cfg.DownloadAllowedDomains)
+	}
+}
+
+func TestApplyFileConfigToRuntime_AllowsExplicitEmptyExtensionPaths(t *testing.T) {
+	cfg := &RuntimeConfig{
+		StateDir:       userConfigDir(),
+		ExtensionPaths: []string{defaultExtensionsDir(userConfigDir())},
+	}
+	fc := &FileConfig{
+		Browser: BrowserConfig{
+			ExtensionPaths: []string{},
+		},
+	}
+
+	ApplyFileConfigToRuntime(cfg, fc)
+
+	if len(cfg.ExtensionPaths) != 0 {
+		t.Fatalf("ApplyFileConfigToRuntime ExtensionPaths = %v, want explicit empty list", cfg.ExtensionPaths)
 	}
 }
 

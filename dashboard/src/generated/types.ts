@@ -202,9 +202,7 @@ export interface InstanceMetrics {
  * LaunchInstanceRequest is the request body for launching an instance.
  */
 export interface LaunchInstanceRequest {
-  profileId?: string; // profile ID (prof_XXXXXXXX)
-  name?: string; // profile name
+  profileId?: string; // profile ID (prof_XXXXXXXX) or existing profile name
   mode?: string; // "headed" or empty for headless
   port?: string; // port number as string
-  extensionPaths?: string[]; // Chrome extension paths to load
 }

@@ -65,3 +65,35 @@ func TestHandleLaunchByNameAliasesStartSemantics(t *testing.T) {
 		t.Fatal("Headless = true, want false for mode=headed")
 	}
 }
+
+func TestHandleStartInstanceRejectsExtensionPaths(t *testing.T) {
+	o := NewOrchestratorWithRunner(t.TempDir(), &mockRunner{portAvail: true})
+
+	req := httptest.NewRequest(http.MethodPost, "/instances/start", strings.NewReader(`{"extensionPaths":["/tmp/malicious-ext"]}`))
+	w := httptest.NewRecorder()
+
+	o.handleStartInstance(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "extensionPaths are not supported on instance start requests") {
+		t.Fatalf("body = %q, want extensionPaths rejection message", w.Body.String())
+	}
+}
+
+func TestHandleLaunchByNameRejectsExtensionPaths(t *testing.T) {
+	o := NewOrchestratorWithRunner(t.TempDir(), &mockRunner{portAvail: true})
+
+	req := httptest.NewRequest(http.MethodPost, "/instances/launch", strings.NewReader(`{"extensionPaths":["/tmp/malicious-ext"]}`))
+	w := httptest.NewRecorder()
+
+	o.handleLaunchByName(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "extensionPaths are not supported on instance start requests") {
+		t.Fatalf("body = %q, want extensionPaths rejection message", w.Body.String())
+	}
+}

@@ -33,10 +33,10 @@ export default function StartInstanceModal({ open, profile, onClose }: Props) {
   }, [open, profile?.id, profile?.name]);
 
   const launchCommand = useMemo(() => {
-    if (!profile) return "";
+    if (!profile?.id) return "";
 
     const payload: LaunchInstanceRequest = {
-      profileId: profile.id || profile.name,
+      profileId: profile.id,
       mode: headless ? undefined : "headed",
       port: port.trim() || undefined,
     };
@@ -46,13 +46,17 @@ export default function StartInstanceModal({ open, profile, onClose }: Props) {
 
   const handleLaunch = async () => {
     if (!profile || launchLoading) return;
+    if (!profile.id) {
+      setLaunchError("Profile ID missing");
+      return;
+    }
 
     setLaunchError("");
     setLaunchLoading(true);
 
     try {
       const payload: LaunchInstanceRequest = {
-        name: profile.name,
+        profileId: profile.id,
         port: port.trim() || undefined,
         mode: headless ? undefined : "headed",
       };

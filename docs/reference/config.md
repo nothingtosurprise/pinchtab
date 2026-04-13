@@ -160,7 +160,7 @@ Current nested file-config shape:
     "version": "144.0.7559.133",
     "binary": "/path/to/chrome",
     "extraFlags": "--disable-gpu",
-    "extensionPaths": []
+    "extensionPaths": ["/path/to/pinchtab/extensions"]
   },
   "instanceDefaults": {
     "mode": "headless",
@@ -298,6 +298,14 @@ Use the dedicated config fields instead:
 - `browser.remoteDebuggingPort` for the remote debugging port
 
 For Linux container compatibility, use the runtime-managed path instead of `browser.extraFlags`. PinchTab enables `--no-sandbox` automatically when needed.
+
+By default, PinchTab looks for unpacked Chrome extensions in `<server.stateDir>/extensions`. On a normal local install that means the OS-specific PinchTab config directory plus `extensions/`, for example:
+
+- macOS: `~/Library/Application Support/pinchtab/extensions`
+- Linux: `~/.config/pinchtab/extensions`
+- Windows: `%APPDATA%\\pinchtab\\extensions`
+
+You can change or clear that default with `browser.extensionPaths`.
 
 ## Sections
 

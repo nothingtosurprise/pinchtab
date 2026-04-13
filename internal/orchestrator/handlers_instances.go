@@ -237,6 +237,11 @@ func (o *Orchestrator) handleStartInstance(w http.ResponseWriter, r *http.Reques
 }
 
 func (o *Orchestrator) startInstanceWithRequest(w http.ResponseWriter, r *http.Request, req startInstanceRequest, auditEvent string) {
+	if len(req.ExtensionPaths) > 0 {
+		httpx.Error(w, 400, fmt.Errorf("extensionPaths are not supported on instance start requests; configure browser.extensionPaths on the server instead"))
+		return
+	}
+
 	var profileName string
 	var err error
 

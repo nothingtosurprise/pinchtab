@@ -132,6 +132,11 @@ func (h *Handlers) HandleTabMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, _, err := h.Bridge.TabContext(tabID); err != nil {
+		httpx.Error(w, http.StatusNotFound, fmt.Errorf("tab not found"))
+		return
+	}
+
 	mem, err := h.Bridge.GetMemoryMetrics(tabID)
 	if err != nil {
 		httpx.Error(w, 500, fmt.Errorf("failed to get metrics: %w", err))
