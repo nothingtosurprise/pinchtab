@@ -15,7 +15,8 @@ export type SectionId =
   | "network"
   | "browser"
   | "timeouts"
-  | "autosolver";
+  | "autosolver"
+  | "observability";
 
 export const sections: Array<{
   id: SectionId;
@@ -71,6 +72,11 @@ export const sections: Array<{
     id: "autosolver",
     label: "AutoSolver",
     description: "Challenge-solving behavior and config-file-backed providers.",
+  },
+  {
+    id: "observability",
+    label: "Observability",
+    description: "Activity logging and retention settings.",
   },
 ];
 

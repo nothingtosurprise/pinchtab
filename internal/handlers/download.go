@@ -24,6 +24,7 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/authn"
 	"github.com/pinchtab/pinchtab/internal/bridge"
 	"github.com/pinchtab/pinchtab/internal/config"
@@ -466,6 +467,7 @@ func (h *Handlers) HandleDownload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			responseMIME = mime
+			h.recordActivity(r, activity.Update{Action: "download", URL: dlURL})
 			h.writeDownloadResponse(w, body, responseMIME, dlURL, output, filePath, raw, maxDownloadBytes)
 			return
 		}
@@ -512,6 +514,7 @@ func (h *Handlers) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("get response body: %w", err))
 		return
 	}
+	h.recordActivity(r, activity.Update{Action: "download", URL: dlURL})
 	h.writeDownloadResponse(w, body, responseMIME, dlURL, output, filePath, raw, maxDownloadBytes)
 }
 

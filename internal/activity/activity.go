@@ -15,7 +15,7 @@ import (
 const (
 	defaultQueryLimit    = 200
 	maxQueryLimit        = 1000
-	defaultRetentionDays = 1
+	defaultRetentionDays = 30
 )
 
 type Config struct {

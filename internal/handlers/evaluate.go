@@ -12,6 +12,7 @@ import (
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/httpx"
 )
 
@@ -74,6 +75,8 @@ func (h *Handlers) HandleEvaluate(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("evaluate: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "evaluate"})
 
 	httpx.JSON(w, 200, map[string]any{"result": result})
 }

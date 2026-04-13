@@ -12,6 +12,7 @@ import (
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/httpx"
 	"github.com/pinchtab/pinchtab/internal/state"
 )
@@ -37,6 +38,8 @@ func (h *Handlers) HandleStateList(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("list states: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "state.list"})
 
 	httpx.JSON(w, 200, map[string]any{
 		"states": entries,
@@ -70,6 +73,8 @@ func (h *Handlers) HandleStateShow(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("load state: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "state.show"})
 
 	httpx.JSON(w, 200, sf)
 }
@@ -239,6 +244,8 @@ func (h *Handlers) HandleStateSave(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("save state: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "state.save"})
 
 	slog.Info("state saved",
 		"name", sf.Name,
@@ -413,6 +420,8 @@ func (h *Handlers) HandleStateLoad(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.recordActivity(r, activity.Update{Action: "state.load"})
+
 	slog.Info("state loaded",
 		"name", req.Name,
 		"path", path,
@@ -451,6 +460,8 @@ func (h *Handlers) HandleStateDelete(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("delete state: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "state.delete"})
 
 	slog.Info("state deleted",
 		"name", name,
@@ -491,6 +502,8 @@ func (h *Handlers) HandleStateClean(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("clean states: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "state.clean"})
 
 	slog.Info("state clean",
 		"olderThanHours", req.OlderThanHours,

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/httpx"
 )
 
@@ -139,6 +140,8 @@ func (h *Handlers) handleWaitCore(w http.ResponseWriter, r *http.Request, req wa
 		httpx.Error(w, 400, fmt.Errorf("one of selector, text, url, load, fn, or ms is required"))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "wait." + mode, TabID: req.TabID})
 	if mode == "fn" && !h.evaluateEnabled() {
 		httpx.ErrorCode(w, 403, "evaluate_disabled", httpx.DisabledEndpointMessage("evaluate", "security.allowEvaluate"), false, map[string]any{
 			"setting": "security.allowEvaluate",

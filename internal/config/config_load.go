@@ -96,7 +96,7 @@ func Load() *RuntimeConfig {
 			Activity: ActivityConfig{
 				Enabled:        true,
 				SessionIdleSec: 1800,
-				RetentionDays:  1,
+				RetentionDays:  30,
 				StateDir:       "",
 			},
 		},

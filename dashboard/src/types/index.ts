@@ -284,7 +284,7 @@ export const defaultBackendConfig: BackendConfig = {
     activity: {
       enabled: true,
       sessionIdleSec: 1800,
-      retentionDays: 1,
+      retentionDays: 30,
       stateDir: "",
       events: {
         dashboard: false,

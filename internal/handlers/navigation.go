@@ -14,6 +14,7 @@ import (
 
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/bridge"
 	"github.com/pinchtab/pinchtab/internal/engine"
 	"github.com/pinchtab/pinchtab/internal/httpx"
@@ -431,6 +432,9 @@ func (h *Handlers) HandleTab(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 500, err)
 			return
 		}
+
+		h.recordActivity(r, activity.Update{Action: "tab.close", TabID: req.TabID})
+
 		httpx.JSON(w, 200, map[string]any{"closed": true})
 
 	case "focus":
@@ -442,6 +446,9 @@ func (h *Handlers) HandleTab(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 404, err)
 			return
 		}
+
+		h.recordActivity(r, activity.Update{Action: "tab.focus", TabID: req.TabID})
+
 		httpx.JSON(w, 200, map[string]any{"focused": true, "tabId": req.TabID})
 
 	default:

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pinchtab/pinchtab/internal/activity"
 	"github.com/pinchtab/pinchtab/internal/httpx"
 )
 
@@ -82,6 +83,8 @@ func (h *Handlers) handleStorageGet(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("parse storage result: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "storage.read"})
 
 	slog.Info("storage: get",
 		"type", storageType,
@@ -166,6 +169,8 @@ func (h *Handlers) handleStorageSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordActivity(r, activity.Update{Action: "storage.write"})
+
 	slog.Info("storage: set",
 		"type", req.Type,
 		"key", req.Key,
@@ -243,6 +248,8 @@ func (h *Handlers) handleStorageDelete(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, fmt.Errorf("parse storage delete result: %w", err))
 		return
 	}
+
+	h.recordActivity(r, activity.Update{Action: "storage.delete"})
 
 	slog.Info("storage: delete",
 		"type", req.Type,
