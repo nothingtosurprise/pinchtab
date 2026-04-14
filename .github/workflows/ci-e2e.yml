@@ -35,6 +35,7 @@ jobs:
       api_extended_touched: ${{ steps.changes.outputs.api_extended_touched }}
       cli_extended_touched: ${{ steps.changes.outputs.cli_extended_touched }}
       infra_extended_touched: ${{ steps.changes.outputs.infra_extended_touched }}
+      npm_cli_touched: ${{ steps.changes.outputs.npm_cli_touched }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -63,6 +64,12 @@ jobs:
             echo "infra_extended_touched=true" >> "$GITHUB_OUTPUT"
           else
             echo "infra_extended_touched=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED" | grep -E '^npm/|^cmd/pinchtab/|^internal/config/|^\.github/workflows/(ci-e2e|reusable-npm-e2e|reusable-npm|reusable-release-publish)\.yml$' >/dev/null; then
+            echo "npm_cli_touched=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_cli_touched=false" >> "$GITHUB_OUTPUT"
           fi
 
   api:
@@ -161,3 +168,18 @@ jobs:
       summary_title: E2E Infra Extended Tests
       timeout_minutes: 25
       compose_file: tests/e2e/docker-compose-multi.yml
+
+  npm-cli-macos-pr:
+    needs: [detect-changes]
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.npm_cli_touched == 'true'
+    uses: ./.github/workflows/reusable-npm-e2e.yml
+    with:
+      ref: ${{ github.sha }}
+      summary_title: E2E npm CLI Tests (macOS)
+
+  npm-cli-macos:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'all'
+    uses: ./.github/workflows/reusable-npm-e2e.yml
+    with:
+      ref: ${{ github.sha }}
+      summary_title: E2E npm CLI Tests (macOS)

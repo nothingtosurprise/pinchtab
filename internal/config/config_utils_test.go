@@ -134,3 +134,23 @@ func TestUserConfigDirPrefersNewConfigFileWhenPresent(t *testing.T) {
 		t.Fatalf("userConfigDir() = %q, want new XDG path %q", got, newDir)
 	}
 }
+
+func TestUserConfigDirDarwinAlwaysUsesLegacyPath(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific path test")
+	}
+
+	tmpHome, err := os.MkdirTemp("", "pinchtab-home-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp home: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpHome) }()
+
+	t.Setenv("HOME", tmpHome)
+
+	got := userConfigDir()
+	want := filepath.Join(tmpHome, ".pinchtab")
+	if got != want {
+		t.Fatalf("userConfigDir() = %q, want macOS default path %q", got, want)
+	}
+}

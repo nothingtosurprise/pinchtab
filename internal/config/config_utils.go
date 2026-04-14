@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -22,6 +23,12 @@ func homeDir() string {
 func userConfigDir() string {
 	home := homeDir()
 	legacyPath := filepath.Join(home, ".pinchtab")
+
+	// On macOS, keep config and state rooted in ~/.pinchtab so the CLI,
+	// npm-managed binary, and config path all resolve to the same location.
+	if runtime.GOOS == "darwin" {
+		return legacyPath
+	}
 
 	configDir, err := os.UserConfigDir()
 	if err != nil {
