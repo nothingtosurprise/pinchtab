@@ -34,6 +34,10 @@ COMMANDS=(
   "  api-extended:🐳:API extended (multi-instance)"
   "  cli-extended:🐳:CLI extended tests"
   "  infra-extended:🐳:Infra extended (multi-instance)"
+  "benchmark:📊:Benchmark lanes"
+  "  baseline:📊:Run benchmark baseline lane"
+  "  agent:📊:Run PinchTab benchmark via Anthropic Messages API"
+  "  agent-browser:📊:Run agent-browser benchmark via Anthropic Messages API"
   "doctor:🩺:Setup dev environment"
   "check go:🧪:Go only"
   "check dashboard:🧪:Dashboard only"
@@ -158,6 +162,17 @@ run_command() {
       echo "  ${ACCENT}${BOLD}💨 Docker smoke test${NC}"
       echo ""
       exec bash scripts/docker-smoke.sh "$image"
+      ;;
+    "benchmark")
+      echo "  ${ACCENT}${BOLD}📊 Benchmark${NC}"
+      echo ""
+      exec bash scripts/dev-benchmark.sh help
+      ;;
+    "benchmark "*)
+      echo "  ${ACCENT}${BOLD}📊 Benchmark${NC}"
+      echo ""
+      local benchmark_args="${target#benchmark }"
+      exec bash scripts/dev-benchmark.sh ${benchmark_args}
       ;;
     "e2e"*)
       local suite="release"
@@ -304,6 +319,13 @@ if [ $# -gt 0 ]; then
         run_command "binary $2"
       else
         run_command "binary"
+      fi
+      ;;
+    benchmark)
+      if [ $# -gt 1 ]; then
+        exec bash scripts/dev-benchmark.sh "${@:2}"
+      else
+        exec bash scripts/dev-benchmark.sh help
       fi
       ;;
     *) run_command "$1" ;;

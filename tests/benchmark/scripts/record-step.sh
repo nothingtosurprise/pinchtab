@@ -7,17 +7,17 @@
 #
 # Options:
 #   --type baseline|agent|agent-browser   Report type (default: auto-detect most recent)
-#   --tokens <in> <out>     Deprecated and ignored (kept for compatibility)
+#   --tokens <in> <out>     Deprecated compatibility field; benchmark reporting now prefers exact run-level usage
 #   --bytes <n>             HTTP response size in bytes (baseline runs)
 #   --tool-calls <n>        Override auto-counted tool calls
 #   --observed <text>       Deprecated alias for answer text
 #   --answer <text>         Optional explicit answer text
 #
 # Examples:
-#   ./record-step.sh 1 1 pass "Navigation completed"
+#   ./record-step.sh 1 1 answer "Navigation completed" "Observed output"
 #   ./record-step.sh --type agent 2 3 fail "Element not found"
 #   ./record-step.sh --type agent 2 4 answer "Robert Griesemer, 2009" "read infobox"
-#   ./record-step.sh --type baseline 1 2 pass --bytes 4520 "Snapshot returned"
+#   ./record-step.sh --type baseline 1 2 answer --bytes 4520 "Snapshot returned" "Observed output"
 
 set -euo pipefail
 
@@ -158,9 +158,9 @@ BENCHMARK_TYPE=$(jq -r '.benchmark.type' "${REPORT_FILE}")
 case "${BENCHMARK_TYPE}" in
     baseline)
         case "${STATUS}" in
-            pass|fail|skip) ;;
+            pass|fail|skip|answer) ;;
             *)
-                echo "ERROR: baseline steps must use pass, fail, or skip"
+                echo "ERROR: baseline steps must use answer, fail, skip, or legacy pass"
                 exit 1
                 ;;
         esac

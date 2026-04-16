@@ -74,24 +74,32 @@ curl -sf -H "Authorization: Bearer benchmark-token" http://localhost:9867/health
 | 5 Implement | **Main agent** | Make the change, leave uncommitted |
 | 6 Log | **Main agent** | Append to optimization_log.md |
 
-## Baseline is a Prerequisite, Not Part of the Loop
+## Baseline is a Shell Verification, Not an Agent Run
 
-The baseline suite (`BASELINE_TASKS.md`) validates that the benchmark infrastructure itself works — fixtures serve correctly, PinchTab APIs behave as expected, and the test conditions are reachable. It's deterministic (no LLM involved), so once it's at 100% it stays at 100% unless something changes underneath it.
+The baseline suite (`scripts/baseline.sh`) validates that the benchmark infrastructure itself works — fixtures serve correctly, PinchTab APIs behave as expected, and the test conditions are reachable. It's deterministic (no LLM involved), so once it's at 100% it stays at 100% unless something changes underneath it.
 
-**The loop does NOT re-run the baseline each iteration.** Instead, run the baseline manually when any of these change:
+Run baseline directly as a shell command:
+
+```bash
+./scripts/run-optimization.sh
+./scripts/baseline.sh
+```
+
+**The optimization loop does NOT treat baseline as an agent task and does NOT re-run it every iteration.** Instead, run the baseline manually when any of these change:
 
 - PinchTab server code (anything in `internal/` that affects the HTTP API)
 - Fixtures (anything in `tests/benchmark/fixtures/`)
-- `BASELINE_TASKS.md` itself (adding/modifying tests)
+- `scripts/baseline.sh` itself (adding/modifying tests)
 - `docker-compose.yml` or the Docker image
 
 **Workflow for adding a new test case:**
 
-1. Write the new test in `BASELINE_TASKS.md` (curl commands + pass condition)
+1. Write the executable baseline case in `scripts/baseline.sh`.
+   If you keep `BASELINE_TASKS.md` around as reference material, update it second.
 2. Write the matching task in `AGENT_TASKS.md` (natural language)
 3. Write the summary row in `TEST_CASES.md`
 4. Add any new fixture files needed
-5. **Run the baseline** — it must reach 100% before the case is considered valid
+5. **Run the baseline shell verification** — it must reach 100% before the case is considered valid
 6. If baseline fails: fix the test/fixture/PinchTab until it passes
 7. Commit the new case — now the agent loop can use it
 
@@ -146,12 +154,13 @@ Each run appends to `results/optimization_log.md`:
 
 ## Files
 
+- `scripts/baseline.sh` — Executable baseline lane source of truth
 - `scripts/run-optimization.sh` — Main loop script (initializes reports)
 - `scripts/record-step.sh` — Appends a step result to the current report
 - `results/optimization_log.md` — Run history (includes per-run metrics table)
 - `results/best_score.txt` — High-water mark for regression detection
 - Changes left uncommitted for manual review and commit
 
-Agent runs use the PinchTab CLI directly via the standard env vars
-(`PINCHTAB_TOKEN`, `PINCHTAB_SERVER`, `PINCHTAB_TAB`) — no helper file to
-source. See `AGENT_TASKS.md` "Recommended setup" for the pattern.
+Agent runs use the benchmark wrapper `./scripts/pt`, which forwards to the
+PinchTab CLI inside Docker while preserving `PINCHTAB_TAB` targeting. See
+`AGENT_TASKS.md` "Recommended setup" for the exact pattern.

@@ -117,59 +117,172 @@ diagnostics (instance management, tab IDs, auth verification) don't apply.
 
 ### Per-Step Metrics
 
+The benchmark now uses an execution/verification split rather than a single
+pass/fail write:
+
 ```bash
-./scripts/record-step.sh --type <lane> <group> <step> <pass|fail> "notes"
+./scripts/record-step.sh --type <lane> <group> <step> answer "<observed result>" "notes"
+./scripts/verify-step.sh --type <lane> <group> <step> <pass|fail|skip> "verification notes"
 ```
 
-- **Group/Step**: Task identifier (e.g., 3.1 = Group 3, Step 1)
-- **Status**: pass, fail, or skip
-- **Notes**: Human-readable result description
-- **Tool Calls**: Browser commands executed (agent-browser only, auto-counted)
+Per-step fields:
 
-**Note**: Per-step token tracking is not currently implemented. The harness
-supports `--tokens <in> <out>` arguments, but agents running inside Claude
-Code don't have access to their own API usage during execution.
+- **Group/Step**: task identifier (for example `3.1`)
+- **Status**:
+  - execution: `answer`, `fail`, or `skip`
+  - verification: `pass`, `fail`, or `skip`
+- **Answer**: raw observed result recorded by the executing lane
+- **Notes**: short human-readable execution or verification note
+- **Tool Calls**: browser commands executed (auto-counted for `agent-browser`)
+
+Baseline now records the same shape as the agent lanes, but verifies each step
+immediately after recording the answer.
+
+### Run-Level Usage
+
+Step-level token fields still exist in the JSON schema for compatibility, but
+the benchmark's precise token accounting lives at **run level** under
+`run_usage`.
+
+This is populated only when the lane runs through a provider API runner, not by
+manual shell execution.
+
+Current runner:
+
+- `tests/benchmark/scripts/run-api-benchmark.ts`
+
+Supported providers:
+
+- Anthropic Messages API
+- OpenAI Responses API
+
+Run-level fields:
+
+| Field | Meaning |
+|-------|---------|
+| `input_tokens` | Fresh uncached input tokens |
+| `cache_creation_input_tokens` | Prompt-cache write tokens |
+| `cache_read_input_tokens` | Prompt-cache hit/read tokens |
+| `total_input_tokens` | Sum of fresh + cache create + cache read |
+| `output_tokens` | Output tokens |
+| `total_tokens` | Sum of total input + output |
+| `request_count` | API requests made by the runner |
 
 ### Aggregate Metrics
 
 | Metric | Description |
 |--------|-------------|
-| Steps Passed | Tasks completed successfully |
-| Steps Failed | Tasks that did not meet verification criteria |
-| Steps Skipped | Tasks not attempted |
-| Total Tokens | Sum of input + output tokens (from API) |
-| Tool Uses | Total LLM tool invocations |
-| Duration | Wall-clock execution time |
+| Steps Answered | Steps with an observed result |
+| Execution Failed | Steps the runner could not complete |
+| Execution Skipped | Steps intentionally skipped |
+| Verified Passed | Answered steps that matched the oracle |
+| Verified Failed | Answered steps that did not match the oracle |
+| Pending Verification | Answered steps not yet verified |
+| Tool Calls | Browser-tool commands executed |
+| Run Usage | Exact provider usage for the whole run |
 
-### How Total Tokens Are Measured
+### How Token Usage Is Measured with API Keys
 
-The `total_tokens` metric is **exact**, not estimated. It comes directly
-from the Anthropic API:
+When running with provider API keys, the benchmark records usage from the API
+response envelope itself rather than asking the model to self-report usage.
 
+Provider selection:
+
+- `OPENAI_API_KEY` -> OpenAI Responses API
+- `ANTHROPIC_API_KEY` -> Anthropic Messages API
+- if both are set, the runner requires explicit `--provider`
+
+Examples:
+
+```bash
+./dev benchmark baseline
+
+OPENAI_API_KEY=... ./dev benchmark agent --provider openai
+OPENAI_API_KEY=... ./dev benchmark agent-browser --provider openai
+
+ANTHROPIC_API_KEY=... ./dev benchmark agent --provider anthropic
+ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --provider anthropic
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  Agent Execution Flow                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Agent Turn 1  ──▶  Anthropic API  ──▶  usage.input: 5,234  │
-│                                         usage.output: 892   │
-│                                                             │
-│  Agent Turn 2  ──▶  Anthropic API  ──▶  usage.input: 6,102  │
-│                                         usage.output: 1,204 │
-│                                                             │
-│  ... (281 tool uses) ...                                    │
-│                                                             │
-│  Claude Code sums all usage  ──▶  total_tokens: 104,695     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
 
-Each API response includes exact token counts. Claude Code accumulates
-these across all turns and reports the total when the agent completes.
+#### Anthropic
 
-This makes `total_tokens` a reliable metric for comparing browser tool
-efficiency, even without per-step breakdown. The total represents the
-**real cost** of completing all 85 tasks with each tool surface.
+The runner reads:
+
+- `input_tokens`
+- `output_tokens`
+- `cache_creation_input_tokens`
+- `cache_read_input_tokens`
+
+These come from Anthropic's `usage` object on each response and are summed
+across the run.
+
+#### OpenAI
+
+The runner reads:
+
+- `usage.input_tokens`
+- `usage.output_tokens`
+- `usage.input_tokens_details.cached_tokens`
+
+The benchmark maps OpenAI cached input tokens into the shared
+`cache_read_input_tokens` field.
+
+### What the Token Total Actually Represents
+
+The run-level total is the cost of the **entire agent loop**, not a pure
+"browser tool only" number. It includes:
+
+- system prompt
+- benchmark instructions
+- tool request/response turns
+- execution + verification reasoning
+- retries and recovery turns
+- any runner-added context summaries
+
+It does **not** include:
+
+- purely local shell execution cost
+- Docker CPU time
+- a separate local token cache outside the provider API
+
+This means the benchmark compares the **real operational cost** of running the
+lane with an agent, not an abstract idealized tool cost.
+
+### Harness Overhead vs Tool Overhead
+
+When using the same API-key runner for both `agent` and `agent-browser`, the
+harness-added overhead is intentionally similar:
+
+- same provider API wrapper
+- same system prompt style
+- same execution/verification workflow
+- same conversation-compaction logic
+- same report-based progress summaries
+
+What can still differ is the tool-under-test overhead:
+
+- tool output shape and verbosity
+- number of tool calls needed
+- recovery behavior after errors
+- command composition efficiency
+
+That remaining difference is the thing the benchmark wants to measure.
+
+### Cost Control and Context Compaction
+
+Naive API runners can become expensive because they resend the entire running
+conversation, including long tool outputs, on every request. The current
+TypeScript API runner reduces this in three ways:
+
+1. tool output is truncated before being fed back to the model
+2. old history is compacted into a short progress summary derived from the
+   benchmark report
+3. Anthropic defaults to a cheaper model (`claude-haiku-4-5-20251001`) unless a
+   different model is specified
+
+This means a benchmark run with API keys is now measuring a more realistic
+agent loop instead of an unnecessarily bloated replay of every prior tool
+result.
 
 ## Results: April 15, 2026 Run
 
@@ -277,6 +390,40 @@ session management is simpler but provides less visibility.
 
 PinchTab's Go implementation with direct Chrome DevTools Protocol access
 is inherently faster than Node.js with Playwright's abstraction layer.
+
+### 4.1 PinchTab-Specific Execution Gotchas
+
+Two PinchTab behaviors are important when interpreting agent traces:
+
+#### Navigation 409s after successful clicks
+
+A navigation-triggering click can return:
+
+```text
+Error 409: unexpected page navigation: http://fixtures/wiki.html -> http://fixtures/wiki-go.html
+```
+
+This does **not** necessarily mean the click failed. It usually means:
+
+1. the click succeeded
+2. the page navigated immediately
+3. the server aborted the in-flight click response because the page changed
+
+Benchmark runners should treat this as "likely success" and verify the result
+with a fresh snapshot or text read.
+
+#### Download endpoint output
+
+The PinchTab download endpoint returns JSON containing base64-encoded file
+content, not a ready-made local file path. A runner that assumes a file already
+exists on disk will fail incorrectly.
+
+The correct handling is:
+
+1. call the download endpoint
+2. parse the JSON response
+3. decode the `data` field from base64
+4. verify the decoded content
 
 ### 5. Docker and Wrapper Overhead
 

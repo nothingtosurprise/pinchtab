@@ -47,8 +47,8 @@ regressions that poison later loops.
 - For server changes: update action in `internal/bridge/...`, update
   `internal/handlers/...` if HTTP contract changes, add tests.
 - For fixture cases: add the HTML/JS fixture in
-  `tests/benchmark/fixtures/<name>.html`, add the baseline step in
-  `BASELINE_TASKS.md`, add the matching agent task in `AGENT_TASKS.md`,
+  `tests/benchmark/fixtures/<name>.html`, add the executable baseline step in
+  `scripts/baseline.sh`, add the matching agent task in `AGENT_TASKS.md`,
   update `TEST_CASES.md` summary, update the verification-strings table.
 - Run `go test ./internal/...` — must pass.
 - Rebuild Docker: `cd tests/benchmark && docker compose up -d --build`.

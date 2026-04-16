@@ -21,11 +21,11 @@ docker compose up -d --build
 ## Recording
 
 ```bash
-# Baseline (no tokens, optional response bytes):
-./scripts/record-step.sh --type baseline <group> <step> <pass|fail> "notes"
+# Baseline execution answer:
+./scripts/record-step.sh --type baseline <group> <step> answer "<observed result>" "notes"
 
-# Minimal (just pass/fail):
-./scripts/record-step.sh <group> <step> <pass|fail> "notes"
+# Immediate verification:
+./scripts/verify-step.sh --type baseline <group> <step> <pass|fail|skip> "verification notes"
 ```
 
 **On failure, include in notes:**

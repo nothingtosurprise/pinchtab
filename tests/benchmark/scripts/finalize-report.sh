@@ -66,13 +66,19 @@ jq -r '
   def pct($a; $b):
     if $b == 0 then "0.0%" else (((1000 * $a) / $b | round) / 10 | tostring) + "%" end;
   . as $root |
-  ($root.totals.steps_passed + $root.totals.steps_failed + $root.totals.steps_skipped) as $baseline_total |
-  (($root.totals.steps_answered // 0) + $root.totals.steps_failed + $root.totals.steps_skipped) as $agent_total |
+  ($root.run_usage // {}) as $usage |
+  ($root.totals.steps_answered // 0) as $answered |
+  ($root.totals.steps_failed // 0) as $execution_failed |
+  ($root.totals.steps_skipped // 0) as $execution_skipped |
+  ($root.totals.steps_passed // 0) as $legacy_passed |
+  ($root.benchmark.type == "baseline" and $answered == 0) as $legacy_baseline |
+  ($legacy_passed + $execution_failed + $execution_skipped) as $legacy_total |
+  ($answered + $execution_failed + $execution_skipped) as $execution_total |
   ($root.totals.steps_verified_passed // 0) as $verified_passed |
   ($root.totals.steps_verified_failed // 0) as $verified_failed |
   ($root.totals.steps_verified_skipped // 0) as $verified_skipped |
   ($root.totals.steps_pending_verification // 0) as $pending |
-  (if $root.benchmark.type == "baseline" then
+  (if $legacy_baseline then
     [
       "# Benchmark Summary",
       "",
@@ -80,10 +86,10 @@ jq -r '
       "|--------|-------|",
       "| Type | \($root.benchmark.type) |",
       "| Model | \($root.benchmark.model) |",
-      "| Steps Passed | \($root.totals.steps_passed) |",
-      "| Steps Failed | \($root.totals.steps_failed) |",
-      "| Steps Skipped | \($root.totals.steps_skipped) |",
-      "| Pass Rate | \(pct($root.totals.steps_passed; $baseline_total)) |",
+      "| Steps Passed | \($legacy_passed) |",
+      "| Steps Failed | \($execution_failed) |",
+      "| Steps Skipped | \($execution_skipped) |",
+      "| Pass Rate | \(pct($legacy_passed; $legacy_total)) |",
       "| Tool Calls | \($root.totals.tool_calls // 0) |"
     ]
   else
@@ -94,18 +100,40 @@ jq -r '
       "|--------|-------|",
       "| Type | \($root.benchmark.type) |",
       "| Model | \($root.benchmark.model) |",
-      "| Steps Answered | \($root.totals.steps_answered // 0) |",
-      "| Steps Failed | \($root.totals.steps_failed) |",
-      "| Steps Skipped | \($root.totals.steps_skipped) |",
-      "| Answer Rate | \(pct($root.totals.steps_answered // 0; $agent_total)) |",
+      "| Steps Answered | \($answered) |",
+      "| Execution Failed | \($execution_failed) |",
+      "| Execution Skipped | \($execution_skipped) |",
+      "| Answer Rate | \(pct($answered; $execution_total)) |",
       "| Verified Passed | \($verified_passed) |",
       "| Verified Failed | \($verified_failed) |",
       "| Verified Skipped | \($verified_skipped) |",
       "| Pending Verification | \($pending) |",
-      "| Verification Pass Rate | \(pct($verified_passed; $agent_total)) |",
+      "| Verification Pass Rate | \(pct($verified_passed; $execution_total)) |",
       "| Tool Calls | \($root.totals.tool_calls // 0) |"
     ]
   end)[],
+  "",
+  "## Run Usage",
+  "",
+  (
+    if (($usage.provider // "") == "" and ($usage.total_tokens // 0) == 0 and ($usage.request_count // 0) == 0) then
+      ["- none recorded"]
+    else
+      [
+        "| Metric | Value |",
+        "|--------|-------|",
+        "| Source | \($usage.source // "unknown") |",
+        "| Provider | \($usage.provider // "unknown") |",
+        "| API Requests | \($usage.request_count // 0) |",
+        "| Input Tokens (uncached) | \($usage.input_tokens // 0) |",
+        "| Cache Creation Input Tokens | \($usage.cache_creation_input_tokens // 0) |",
+        "| Cache Read Input Tokens | \($usage.cache_read_input_tokens // 0) |",
+        "| Total Input Tokens | \($usage.total_input_tokens // 0) |",
+        "| Output Tokens | \($usage.output_tokens // 0) |",
+        "| Total Tokens | \($usage.total_tokens // 0) |"
+      ]
+    end
+  )[],
   "",
   "## Pending Verification",
   "",
@@ -130,3 +158,5 @@ jq -r '
 ' "${REPORT_FILE}" > "${SUMMARY_FILE}"
 
 echo "Wrote ${SUMMARY_FILE}"
+echo ""
+cat "${SUMMARY_FILE}"

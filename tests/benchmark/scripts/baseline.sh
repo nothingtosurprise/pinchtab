@@ -2,6 +2,13 @@
 # Runs every baseline task against the running PinchTab container and records
 # each step into the most recent baseline_*.json report (see run-optimization.sh).
 #
+# IMPORTANT:
+#   - This script is the executable source of truth for the baseline lane.
+#   - `tests/benchmark/BASELINE_TASKS.md` is descriptive/spec documentation only;
+#     `./dev benchmark baseline` does not parse that markdown file.
+#   - If baseline behavior changes, update this script first and then update
+#     any markdown/docs that describe the baseline contract.
+#
 # Prerequisites:
 #   - `bash scripts/run-optimization.sh` has been run first (initializes the
 #     empty baseline_*.json this script appends into).
@@ -17,11 +24,33 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 AUTH="Authorization: Bearer benchmark-token"
 BASE="http://localhost:9867"
-REC() { ./scripts/record-step.sh --type baseline "$@" > /dev/null; }
+REC() {
+  local group="$1"
+  local step="$2"
+  local verdict="$3"
+  shift 3
+
+  local answer="${1:-}"
+  local notes="${2:-$answer}"
+
+  case "${verdict}" in
+    pass|fail)
+      ./scripts/record-step.sh --type baseline "${group}" "${step}" answer "${answer}" "${notes}" > /dev/null
+      ./scripts/verify-step.sh --type baseline "${group}" "${step}" "${verdict}" "${notes}" > /dev/null
+      ;;
+    skip)
+      ./scripts/record-step.sh --type baseline "${group}" "${step}" skip "${notes}" > /dev/null
+      ;;
+    *)
+      echo "ERROR: unsupported baseline verdict: ${verdict}" >&2
+      return 1
+      ;;
+  esac
+}
 
 # VERIFY_MARKER <group> <step> <text> <marker> ["extra notes"]
-# Grep for the marker in the text; record pass with the marker as evidence
-# (so the verifier can audit baseline results), or fail with what was expected.
+# Grep for the marker in the text; record the observed marker as the baseline
+# answer and immediately stamp verification.
 VERIFY_MARKER() {
   local g="$1" s="$2" text="$3" marker="$4" extra="${5:-}"
   if printf '%s' "$text" | grep -q "$marker"; then

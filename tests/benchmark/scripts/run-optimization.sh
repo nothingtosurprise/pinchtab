@@ -7,6 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BENCH_DIR="${SCRIPT_DIR}/.."
 RESULTS_DIR="${SCRIPT_DIR}/../results"
 mkdir -p "${RESULTS_DIR}"
 LOG_FILE="${RESULTS_DIR}/optimization_log.md"
@@ -19,11 +20,8 @@ RUN_NUMBER=$((RUN_NUMBER + 1))
 echo "=== PinchTab Optimization Run #${RUN_NUMBER} ==="
 echo "Timestamp: ${TIMESTAMP}"
 
-# Run on current branch
-cd ~/dev/pinchtab
-
 # Ensure Docker is running
-cd "${SCRIPT_DIR}"
+cd "${BENCH_DIR}"
 if ! docker compose ps 2>/dev/null | grep -q "running"; then
     echo "Starting Docker..."
     docker compose up -d --build
@@ -48,16 +46,34 @@ cat > "${BASELINE_REPORT}" << EOF
     "type": "baseline",
     "run_number": ${RUN_NUMBER},
     "timestamp": "${TIMESTAMP}",
-    "model": "claude-haiku-4-5"
+    "model": "${BENCHMARK_MODEL:-baseline}",
+    "runner": "${BENCHMARK_RUNNER:-manual}"
   },
   "totals": {
     "input_tokens": 0,
     "output_tokens": 0,
     "total_tokens": 0,
     "estimated_cost_usd": 0,
+    "tool_calls": 0,
     "steps_passed": 0,
     "steps_failed": 0,
-    "steps_skipped": 0
+    "steps_skipped": 0,
+    "steps_answered": 0,
+    "steps_verified_passed": 0,
+    "steps_verified_failed": 0,
+    "steps_verified_skipped": 0,
+    "steps_pending_verification": 0
+  },
+  "run_usage": {
+    "source": "none",
+    "provider": "",
+    "request_count": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "total_input_tokens": 0,
+    "total_tokens": 0
   },
   "steps": []
 }
@@ -69,16 +85,34 @@ cat > "${AGENT_REPORT}" << EOF
     "type": "agent",
     "run_number": ${RUN_NUMBER},
     "timestamp": "${TIMESTAMP}",
-    "model": "claude-haiku-4-5"
+    "model": "${BENCHMARK_MODEL:-unknown}",
+    "runner": "${BENCHMARK_RUNNER:-manual}"
   },
   "totals": {
     "input_tokens": 0,
     "output_tokens": 0,
     "total_tokens": 0,
     "estimated_cost_usd": 0,
+    "tool_calls": 0,
     "steps_passed": 0,
     "steps_failed": 0,
-    "steps_skipped": 0
+    "steps_skipped": 0,
+    "steps_answered": 0,
+    "steps_verified_passed": 0,
+    "steps_verified_failed": 0,
+    "steps_verified_skipped": 0,
+    "steps_pending_verification": 0
+  },
+  "run_usage": {
+    "source": "none",
+    "provider": "",
+    "request_count": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "total_input_tokens": 0,
+    "total_tokens": 0
   },
   "steps": []
 }
@@ -87,8 +121,8 @@ EOF
 printf '%s\n' "${BASELINE_REPORT}" > "${CURRENT_BASELINE_PTR}"
 printf '%s\n' "${AGENT_REPORT}" > "${CURRENT_AGENT_PTR}"
 
-# Clear previous agent commands log
-rm -f "${RESULTS_DIR}/agent_commands.log"
+# Clear previous agent command trace
+rm -f "${RESULTS_DIR}/agent_commands.ndjson"
 
 echo "Reports initialized:"
 echo "  Baseline: ${BASELINE_REPORT}"

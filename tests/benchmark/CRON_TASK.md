@@ -1,63 +1,85 @@
 # PinchTab Optimization Cron Task
 
-**Goal: Close the gap between baseline (explicit curl) and agent (natural language).**
+**Goal: improve the agent lane against a known-good benchmark environment.**
 
-Every run must bring the agent closer to 100%. If already at 100%, expand tests.
+Baseline is not part of the recurring agent task. It is a direct shell
+verification that should be run after infrastructure, fixture, or benchmark
+changes to confirm the environment still behaves as expected.
 
 ---
 
-## Task for Agent
+## Baseline Gate
+
+Run baseline manually when any of these change:
+
+- PinchTab server or CLI behavior
+- benchmark fixtures
+- `tests/benchmark/scripts/baseline.sh`
+- benchmark Docker setup
+
+Command:
+
+```bash
+cd ~/dev/pinchtab/tests/benchmark
+./scripts/run-optimization.sh
+./scripts/baseline.sh
+./scripts/finalize-report.sh "$(cat ./results/current_baseline_report.txt)"
+```
+
+Only continue with optimization work if baseline is green.
+
+---
+
+## Recurring Optimization Task
 
 ### Step 1 — Setup
 ```bash
 cd ~/dev/pinchtab/tests/benchmark
 git checkout feat/benchmark && git pull --rebase origin feat/benchmark
-./run-optimization.sh
+./scripts/run-optimization.sh
 # Note the TIMESTAMP from output
 ```
 
-### Step 2 — Run Baseline Benchmark
-Execute BASELINE_TASKS.md exactly as written.
-- Token: `benchmark-token`
-- Record each step: `./record-step.sh <group> <step> <pass|fail> <in> <out> "notes"`
-- For failures: include HTTP status, expected string, actual response in notes
+### Step 2 — Run Agent Benchmark
+Execute `AGENT_TASKS.md` using `skills/pinchtab/SKILL.md` as the guide.
 
-### Step 3 — Run Agent Benchmark
-Execute AGENT_TASKS.md using SKILL.md as your only guide.
-- **Do NOT look at BASELINE_TASKS.md**
-- Figure out commands from skill documentation
-- Record: `./record-agent-step.sh <group> <step> <pass|fail> <in> <out> "commands used" "result"`
-- Log every curl/command executed
+- Use the benchmark wrapper `./scripts/pt`
+- Record results with `record-step.sh --type agent`
+- Verify answers with `verify-step.sh`
+- Log every command executed
+- Do not use baseline as an execution guide
 
-### Step 4 — Gap Analysis
-Compare results and classify each agent failure:
+### Step 3 — Gap Analysis
+Compare agent results against the latest green baseline report and classify failures:
 
 | Failure Type | Cause | Fix |
 |---|---|---|
-| **Wrong endpoint** | Agent used `/text` when should use `/snapshot` | Improve SKILL.md |
-| **Wrong selector** | Agent guessed selector incorrectly | Improve SKILL.md or fixture |
-| **Missing step** | Agent skipped a required action | Clarify AGENT_TASKS.md |
-| **Wrong URL** | Agent used wrong fixture path | Clarify AGENT_TASKS.md |
+| **Wrong endpoint** | Agent used `/text` when should use `/snapshot` | Improve `SKILL.md` |
+| **Wrong selector** | Agent guessed selector incorrectly | Improve `SKILL.md` or fixture |
+| **Missing step** | Agent skipped a required action | Clarify `AGENT_TASKS.md` |
+| **Wrong URL** | Agent used wrong fixture path | Clarify `AGENT_TASKS.md` |
 | **API bug** | Endpoint behaves unexpectedly | Fix PinchTab code |
-| **Test ambiguity** | Verification string hard to find | Fix fixture or test |
+| **Test ambiguity** | Verification string hard to find | Fix fixture or `scripts/baseline.sh` |
 
-### Step 5 — Make Exactly 1 Change
+### Step 4 — Make Exactly 1 Change
 
 Priority order:
 1. **API Bug** → Fix PinchTab Go code, commit as `fix: <description>`
-2. **Skill Gap** → Improve SKILL.md with clearer guidance or example, commit as `docs(skill): <description>`
-3. **Test Ambiguity** → Fix fixture HTML or BASELINE_TASKS.md verification, commit as `test: <description>`
-4. **Agent Task Clarity** → Improve AGENT_TASKS.md phrasing, commit as `test(agent): <description>`
-5. **No Gaps Found** → Add 2-3 new test cases covering uncovered scenarios, commit as `test: add cases for <scenario>`
+2. **Skill Gap** → Improve `SKILL.md`, commit as `docs(skill): <description>`
+3. **Test Ambiguity** → Fix fixture HTML or `scripts/baseline.sh`, commit as `test: <description>`
+4. **Agent Task Clarity** → Improve `AGENT_TASKS.md`, commit as `test(agent): <description>`
+5. **No Gaps Found** → Add new benchmark coverage, with matching baseline + agent cases
 
-**If agent is already at 100%**: Add harder cases (nested interactions, state persistence, multi-page flows).
+**If agent is already at 100%**: add harder cases.
 
-### Step 6 — Verify the Fix Makes Sense
-Before committing, ask: "Will this change help the agent pick the right tool next time?"
-- If you fixed a skill doc: check that the added text directly addresses the failure
-- If you fixed a test: check the verification string is reachable via snapshot
+### Step 5 — Verify the Fix Makes Sense
+Before committing, ask:
 
-### Step 7 — Commit & Push
+- will this change help the agent pick the right tool next time?
+- if this is a skill/docs fix, does it directly address the observed failure?
+- if this is a benchmark fix, is the expected signal reachable via the real tool flow?
+
+### Step 6 — Commit & Push
 ```bash
 cd ~/dev/pinchtab
 git add -A
@@ -65,14 +87,14 @@ git commit -m "<type>: <clear description of what changed and why>"
 git push origin feat/benchmark
 ```
 
-### Step 8 — Log the Run
+### Step 7 — Log the Run
 Append to `results/optimization_log.md`:
 
 ```markdown
 ## Run #N — YYYY-MM-DD HH:MM
 
 **Results:**
-- Baseline: X/Y (Z%)
+- Baseline reference: X/Y (Z%)
 - Agent: X/Y (Z%)
 - Gap: N steps
 
@@ -93,11 +115,12 @@ Append to `results/optimization_log.md`:
 [What to watch in the next run]
 ```
 
-### Step 9 — Report to User
+### Step 8 — Report to User
 Send a concise update:
-```
+
+```text
 Run #N complete
-Baseline: X% | Agent: Y% | Gap: N steps
+Baseline reference: X% | Agent: Y% | Gap: N steps
 Failure: [brief description]
 Fix: [what changed] ([commit])
 ```
@@ -107,12 +130,13 @@ Fix: [what changed] ([commit])
 ## Success Criteria
 
 - **Short term**: Agent pass rate ≥ 95%
-- **Long term**: Agent matches baseline on all existing tests
-- **Ongoing**: When gap closes, increase test complexity
+- **Long term**: Agent matches the latest green baseline on all existing tests
+- **Ongoing**: When the gap closes, increase test complexity
 
 ## What NOT to do
 
-- ❌ Don't make multiple changes per run — one focused fix only
-- ❌ Don't skip the analysis step — root cause first, then fix
-- ❌ Don't change tests just to make them easier — the goal is better skill/API
-- ❌ Don't commit if the change doesn't directly address an observed failure
+- Do not run baseline as an agent task
+- Do not make multiple changes per run
+- Do not skip root-cause analysis
+- Do not weaken tests just to improve the score
+- Do not commit a change that does not directly address an observed failure

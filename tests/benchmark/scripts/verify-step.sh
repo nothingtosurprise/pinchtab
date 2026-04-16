@@ -4,12 +4,13 @@
 # step.
 #
 # Usage:
-#   ./verify-step.sh [--type agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> "notes"
+#   ./verify-step.sh [--type baseline|agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> "notes"
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${SCRIPT_DIR}/../results"
+CURRENT_BASELINE_PTR="${RESULTS_DIR}/current_baseline_report.txt"
 CURRENT_AGENT_PTR="${RESULTS_DIR}/current_agent_report.txt"
 CURRENT_AGENT_BROWSER_PTR="${RESULTS_DIR}/current_agent_browser_report.txt"
 
@@ -34,7 +35,7 @@ while [[ $# -gt 0 && "$1" == --* ]]; do
 done
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 [--type agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> [notes]"
+  echo "Usage: $0 [--type baseline|agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> [notes]"
   exit 1
 fi
 
@@ -65,6 +66,10 @@ resolve_current_report() {
 if [[ -z "${REPORT_FILE}" ]]; then
   if [[ -n "${REPORT_TYPE}" ]]; then
     case "${REPORT_TYPE}" in
+      baseline)
+        REPORT_FILE="$(resolve_current_report "${CURRENT_BASELINE_PTR}" || true)"
+        [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/baseline_*.json 2>/dev/null | head -1)
+        ;;
       agent)
         REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_PTR}" || true)"
         [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_benchmark_*.json 2>/dev/null | head -1)
@@ -74,19 +79,20 @@ if [[ -z "${REPORT_FILE}" ]]; then
         [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json 2>/dev/null | head -1)
         ;;
       *)
-        echo "ERROR: --type must be 'agent' or 'agent-browser'"
+        echo "ERROR: --type must be 'baseline', 'agent', or 'agent-browser'"
         exit 1
         ;;
     esac
   else
     REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_BROWSER_PTR}" || true)"
     [[ -n "${REPORT_FILE}" ]] || REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_PTR}" || true)"
-    [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json "${RESULTS_DIR}"/agent_benchmark_*.json 2>/dev/null | head -1)
+    [[ -n "${REPORT_FILE}" ]] || REPORT_FILE="$(resolve_current_report "${CURRENT_BASELINE_PTR}" || true)"
+    [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json "${RESULTS_DIR}"/agent_benchmark_*.json "${RESULTS_DIR}"/baseline_*.json 2>/dev/null | head -1)
   fi
 fi
 
 if [[ -z "${REPORT_FILE:-}" || ! -f "${REPORT_FILE}" ]]; then
-  echo "ERROR: no agent benchmark report found"
+  echo "ERROR: no benchmark report found"
   exit 1
 fi
 
@@ -119,4 +125,9 @@ jq --arg id "${STEP_ID}" \
    ' "${REPORT_FILE}" > "${TMP_FILE}"
 
 mv "${TMP_FILE}" "${REPORT_FILE}"
+
+if [[ "${STATUS}" == "fail" ]]; then
+  echo "[${TIMESTAMP}] Step ${STEP_ID} VERIFICATION FAILED: ${NOTES}" >> "${RESULTS_DIR}/errors.log"
+fi
+
 echo "Verified: Step ${STEP_ID} = ${STATUS}"

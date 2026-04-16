@@ -51,7 +51,23 @@ cat > "${REPORT_FILE}" << EOF
     "tool_calls": 0,
     "steps_passed": 0,
     "steps_failed": 0,
-    "steps_skipped": 0
+    "steps_skipped": 0,
+    "steps_answered": 0,
+    "steps_verified_passed": 0,
+    "steps_verified_failed": 0,
+    "steps_verified_skipped": 0,
+    "steps_pending_verification": 0
+  },
+  "run_usage": {
+    "source": "none",
+    "provider": "",
+    "request_count": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "total_input_tokens": 0,
+    "total_tokens": 0
   },
   "steps": []
 }
@@ -67,5 +83,5 @@ echo "  1. Read ./AGENT_BROWSER_INSTRUCTIONS.md"
 echo "  2. Load the live CLI skill with ./scripts/ab skills get agent-browser --full"
 echo "  3. Use ./scripts/ab ... to drive agent-browser inside Docker"
 echo "  4. Record each completed benchmark step with:"
-echo "     ./scripts/record-step.sh --type agent-browser <group> <step> <pass|fail|skip|answer> \"what you saw\" \"notes\""
+echo "     ./scripts/record-step.sh --type agent-browser <group> <step> <answer|fail|skip> \"what you saw\" \"notes\""
 echo "  5. Summarize the report with ./scripts/finalize-report.sh"
