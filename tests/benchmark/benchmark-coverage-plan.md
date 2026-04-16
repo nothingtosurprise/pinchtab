@@ -1,11 +1,11 @@
 # Benchmark Coverage Plan — Weaknesses & Gaps
 
 Living inventory of PinchTab weaknesses that fall outside the iframe roadmap
-(see that separately). Compiled from 16 continuous optimization loops of
-agent + baseline feedback. Rank is by *agent pain per loop* × *tractability*.
+(see that separately). Compiled from continuous optimization loops of agent +
+baseline feedback. Rank is by *agent pain per loop* × *tractability*.
 
-Update each entry as loops land fixes. When an item reaches "resolved", move
-it to the bottom of the file with the loop number that closed it.
+Update each entry as loops land fixes. Delete entries once they are closed —
+this file is a TODO, not an archive.
 
 ---
 
@@ -23,11 +23,9 @@ it to the bottom of the file with the loop number that closed it.
 
 | ID | Missing | Impact | Effort | Status |
 |----|---------|:------:|:------:|--------|
-| B1 | ~~**`pinchtab download --output <path>`**~~ — **Already implemented.** `-o` flag exists. | 🟡 mid | 🟢 easy | **closed** |
 | B2 | **Screenshot / PDF `-o` paths write inside container, not host.** Benchmark-wrapper issue; production installs are fine. Needs wrapper `docker cp` or `--host-path` flag. | 🟡 mid | 🟢 easy | open |
 | B3 | **`<select multiple>` not supported.** `SelectByNodeID` sets `this.value = v` which is single-select only. Real bug. | 🟡 mid | 🟡 medium | open |
 | B4 | **No viewport resize / mobile emulation.** Can't test responsive layouts or mobile-only UI. | 🟡 mid | 🟡 medium | open |
-| B5 | ~~**No `wait --not-text`**~~ — **implemented.** `wait --not-text "Loading..."` waits for text to disappear. `wait <selector> --state hidden` already handled element disappearance. | 🟢 low | 🟢 easy | **closed** |
 | B6 | **No request interception** — `--block-images` / `--block-ads` work but no arbitrary URL pattern blocking or response mocking. | 🟡 mid | 🔴 hard | open |
 | B7 | **No mobile-gesture primitives** — pinch, long-press, two-finger scroll. Niche but will matter. | 🟢 low | 🟡 medium | open |
 
@@ -47,8 +45,6 @@ they actually work for agents in practice.
 | C5 | **`pinchtab console`** JS error/warning capture | 🟡 mid | Add `console.html` fixture that logs + throws |
 | C6 | **`pinchtab upload`** file upload via sandboxed path | 🔴 high | Add `upload.html` fixture + sandbox-path task |
 | C7 | **`pinchtab find`** natural-language element discovery — agents don't know it exists | 🟡 mid | Add 1 task per existing fixture that uses `find` instead of snap+ref |
-| C8 | **`pinchtab handoff`** session handoff between agents | 🟢 low | Niche; defer |
-| C9 | **`pinchtab solve`** CAPTCHA solving | 🟢 low | Needs real sites; defer |
 
 ---
 
@@ -66,14 +62,13 @@ fixture suite. Ranked by frequency in real sites.
 | D5 | **Autocomplete / combobox with suggestions** | high | Google search, Slack picker. |
 | D6 | **Date picker** | high | Booking sites. Native `<input type="date">` vs custom. |
 | D7 | **Draggable list reorder** | medium | Trello, Notion. Current `drag.html` is zone-drop, not list-reorder. |
-| D8 | **Toast / snackbar notifications** | high | Transient content — requires B5. |
+| D8 | **Toast / snackbar notifications** | high | Transient content — pairs with `wait --not-text`. |
 | D9 | **Tooltips on keyboard focus** | medium | Accessibility-first UIs; current `hovers.html` only tests hover. |
 | D10 | **Virtual scrolling** | medium | AG Grid, React Virtualized — off-screen rows not in DOM. |
 | D11 | **Inline async form validation** | high | "Checking username availability..." — wait+re-snap cycle. |
 | D12 | **Modal with backdrop click-to-close** | high | React-style modals, not JS `alert`. |
 | D13 | **Sticky header + table scroll** | medium | Dashboards — scroll-into-view lands under sticky header. |
 | D14 | **Copy-to-clipboard button** | high | Ties to C1. |
-| D15 | **`window.print()` dialog** | low | Edge case but exists. |
 
 ---
 
@@ -83,11 +78,9 @@ Agents cost 1–2 extra tool calls per run because of these.
 
 | ID | Gap | Fix |
 |----|-----|-----|
-| E1 | `pinchtab scroll <pixels>` positional form absent from the short `Use:` string; agents glance there first. | Update `Use:` to `scroll <pixels\|direction\|selector>`. |
 | E2 | `pinchtab tab list` is wrong — it's bare `pinchtab tab`. Agents keep guessing. | Add "list" alias or a SKILL.md note. |
 | E3 | `text --full` vs default Readability trap — agents still default to `text`. | Consider making default retry raw when Readability returns < N chars. |
 | E4 | Container-vs-host paths for `-o` flags — no note in `--help`. | Add note to `screenshot` / `pdf` / `download` help text. |
-| E5 | `pinchtab find` command is invisible. | Surface in SKILL.md "when to use" cheatsheet. |
 | E6 | Error code reference — `-32000`, `409`, `412` show up without context. | Create `skills/pinchtab/references/errors.md`. |
 
 ---
@@ -100,7 +93,6 @@ Not bugs — friction that wrapper / docs could eliminate.
 |----|-----|----------|
 | F1 | No "warm start" hint — agents always do `snap -i -c` first. | SKILL.md: recommend `pinchtab quick <url>` for one-shot tasks. |
 | F2 | No "here's what changed" primitive beyond `snap -d`. | `pinchtab wait-and-diff` as a single call. |
-| F3 | No atomic action batches from CLI. `actions --file batch.json` exists but is invisible. | Surface in SKILL.md. |
 | F4 | Agent re-snapshots after every action — ~half the tool calls. | A `click --then-text` / `click --snap-after` one-shot. |
 
 ---
@@ -118,7 +110,7 @@ When picking the next continuous-loop target, sort by `(agent pain × value) / e
 7. **C6 — file upload fixture + sandbox-path integration**
 8. **D4 — infinite-scroll fixture**
 9. **C3–C5** — storage / network / console coverage
-10. **D5–D15** — remaining real-world patterns
+10. **D5–D14** — remaining real-world patterns
 
 Below that threshold: everything is incremental coverage / doc polish.
 
@@ -127,30 +119,7 @@ Below that threshold: everything is incremental coverage / doc polish.
 ## Iframe coverage — separate roadmap
 
 Covered by the `pinchtab frame` command (landed upstream in PR #471, merged
-into this branch). Current benchmark coverage below; for the full iframe
-functionality roadmap see the user's earlier survey (§1–11).
-
-### Landed
-
-- `pinchtab frame <target|main>` stateful scope.
-- Same-origin iframe scoping (CSS selector, ref, frame name, frame URL).
-- Nested iframe support via successive `frame` hops (verified to 3 levels).
-- `srcdoc` iframes work (same-origin by inheritance).
-- `sandbox="allow-scripts allow-same-origin"` iframes work.
-- Dynamic iframes inserted after page load — paired with `wait --text`.
-- Refs emitted by a full (non-interactive) `snap` carry frame context, so
-  ref-based actions cross the boundary without an explicit scope set.
-
-### Benchmark coverage (77-task suite, Groups 19 + 31-34)
-
-| Group | Scenario | Status |
-|-------|----------|:------:|
-| 19.1 | Read same-origin iframe via full `snap` | ✅ |
-| 19.2 | Interact inside iframe via `frame` scope + selectors | ✅ |
-| 31   | Nested iframes (3 levels) | ✅ |
-| 32   | Dynamic iframe (inserted after load) | ✅ |
-| 33   | `srcdoc` iframe (inline HTML) | ✅ |
-| 34   | Sandboxed iframe (`allow-scripts allow-same-origin`) | ✅ |
+into this branch).
 
 ### Still missing
 
@@ -162,36 +131,7 @@ functionality roadmap see the user's earlier survey (§1–11).
   independently. `Page.navigate` with a `frameId` isn't exposed.
 - **Frame discovery command** — no `pinchtab frames` listing; agents must
   know frame names/URLs in advance.
-- ~~**`text --full` doesn't pierce iframes**~~ — **resolved**.
-  `pinchtab text` now honors the active `frame` scope and accepts an
-  explicit `--frame <frameId>` flag for one-shot reads. Top-level calls are
-  unchanged. See `docs/reference/frame.md` / SKILL.md.
 - **`snap -i -c` still filters iframe children** — full `snap` works but
   adds tokens. A frame-aware interactive filter would be nicer.
 - **Sandboxed iframes without `allow-same-origin`** — opaque origin, out
   of reach. Same gap as cross-origin.
-
-### Resolved (archive)
-
-- **[Loop #30]** — **A1 missing-CSS 30s hang + A2 text: selector reliability.** Both root causes fixed in `internal/bridge/action_common.go` (fast-fail via `chromedp.AtLeast(0)`), `internal/bridge/action_resolve.go` (textContent + 3s cap + leaf-most wins), and `internal/cli/actions/actions_element.go` (stop stripping the selector kind prefix). Baseline 85/85 green; Loop #30 agent used `text:` on 10+ cases with zero failures. Missing-CSS click now 87ms wall-clock (was ~30s).
-- **[Loop #17 batch — same session as coverage plan creation]** — Adopted
-  native `pinchtab frame` in Group 19.2 (replacing the `eval +
-  contentDocument` workaround), added Groups 31–34 covering nested /
-  dynamic / srcdoc / sandboxed iframes, added six new fixtures
-  (`iframe-nested.html`, `iframe-nested-2.html`, `iframe-nested-3.html`,
-  `iframe-dynamic.html`, `iframe-srcdoc.html`, `iframe-sandbox.html`,
-  `iframe-sandbox-content.html`). Baseline 77/77 on the expanded suite.
-  Updated SKILL.md to replace the iframe-eval workaround rule with the
-  native `frame` flow.
-
----
-
-## Resolved (archive — non-iframe)
-
-Populated as loops close items. Each entry: `- [Loop #N] <id> — <one-line
-description>`.
-
-- [Loop #30] A1 — Missing CSS selector hangs (now fast-fail <100ms via `chromedp.AtLeast(0)`)
-- [Loop #30] A2 — `text:<value>` selector reliability (fixed prefix stripping + `textContent`)
-- B1 — `download --output <path>` already implemented (`-o` flag exists)
-- B5 — `wait --not-text "..."` added; `--state hidden` already handled elements
