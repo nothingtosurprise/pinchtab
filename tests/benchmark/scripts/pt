@@ -1,68 +1,14 @@
 #!/usr/bin/env bash
 #
 # Thin wrapper around `pinchtab` for the benchmark harness.
-#
-# Why this exists
-# ---------------
-# In normal use, agents run the `pinchtab` binary directly:
-#
-#     export PINCHTAB_TOKEN=<token>
-#     export PINCHTAB_TAB=$(pinchtab nav http://example.com)
-#     pinchtab snap -i -c
-#     pinchtab click '#submit'
-#
-# The benchmark runs PinchTab inside a Docker container
-# (tests/benchmark/docker-compose.yml) rather than installed on the host, so
-# every CLI invocation has to be prefixed with:
-#
-#     docker exec -e PINCHTAB_TOKEN=... -e PINCHTAB_SERVER=... \
-#       -e PINCHTAB_TAB=... benchmark-pinchtab-1 pinchtab <args...>
-#
-# That ~140-character preamble on every command bloats the agent's context
-# and makes copy-pasted examples unreadable. This script handles the
-# preamble so benchmark callers can just write:
-#
-#     TAB=$(./scripts/pt nav http://fixtures/)
-#     ./scripts/pt snap -i -c              # auto-uses $PINCHTAB_TAB or /tmp/pt-tab
-#     ./scripts/pt click '#submit'
-#     ./scripts/pt eval --await-promise 'window.fetchPayload()'
-#
-# The CLI semantics are identical to running `pinchtab` directly.
-#
-# Tab persistence
-# ---------------
-# Shell functions and env vars don't survive between Bash tool calls in
-# Claude Code. To avoid re-typing `PINCHTAB_TAB=$TAB` on every command, the
-# wrapper writes the tab ID returned by `pt nav` to `/tmp/pt-tab` and reads
-# it back as the default for subsequent calls when $PINCHTAB_TAB isn't set.
-# This is purely a benchmark-harness convenience — production `pinchtab`
-# installs use the regular PINCHTAB_TAB env var.
-#
-# Env vars (override at call time if needed)
-# ------------------------------------------
-#   PINCHTAB_CONTAINER  — container name (default: benchmark-pinchtab-1)
-#   PINCHTAB_TOKEN      — auth token    (default: benchmark-token)
-#   PINCHTAB_SERVER     — server URL    (default: http://localhost:9867)
-#   PINCHTAB_TAB        — default tab ID; overrides the /tmp/pt-tab sidecar.
+# Handles Docker exec prefix only - NO tab management.
+# Agent must handle tabs via PINCHTAB_TAB env var per skill docs.
 
 set -euo pipefail
 
 : "${PINCHTAB_CONTAINER:=benchmark-pinchtab-1}"
 : "${PINCHTAB_TOKEN:=benchmark-token}"
 : "${PINCHTAB_SERVER:=http://localhost:9867}"
-
-PT_TAB_SIDECAR="/tmp/pt-tab"
-
-# Fall back to the sidecar file when PINCHTAB_TAB isn't set in the caller's
-# environment. Trim trailing whitespace so downstream string matches work.
-# Record whether the value came from the sidecar so the `nav` path can
-# self-heal when the cached tab turns out to be dead (e.g. closed by a
-# previous run).
-pt_tab_from_sidecar=0
-if [[ -z "${PINCHTAB_TAB:-}" && -f "${PT_TAB_SIDECAR}" ]]; then
-  PINCHTAB_TAB="$(tr -d '[:space:]' < "${PT_TAB_SIDECAR}")"
-  pt_tab_from_sidecar=1
-fi
 
 args=(docker exec
   -e "PINCHTAB_TOKEN=${PINCHTAB_TOKEN}"
@@ -73,70 +19,5 @@ if [[ -n "${PINCHTAB_TAB:-}" ]]; then
 fi
 
 args+=("${PINCHTAB_CONTAINER}" pinchtab "$@")
-
-# For `pt nav` with stdout piped (the $(pt nav URL) capture idiom), record
-# the emitted tab ID into the sidecar so subsequent commands can pick it up
-# without the caller having to `export PINCHTAB_TAB`. Keep the stdout
-# contract unchanged — the tab ID still goes to stdout, exactly as before.
-#
-# Only update the sidecar when both (a) the underlying `pinchtab nav` call
-# succeeded (exit 0) and (b) it emitted a well-formed 32-character hex tab
-# ID. Otherwise the sidecar would point at a ghost tab and every later
-# command would silently target nothing.
-if [[ "${1:-}" == "nav" && ! -t 1 ]]; then
-  # Capture stdout and stderr separately so the caller still sees the tab
-  # ID on stdout, while we can inspect stderr for self-heal signals.
-  pt_err_file="$(mktemp -t pt-nav-err.XXXXXX)"
-  set +e
-  output="$("${args[@]}" 2>"${pt_err_file}")"
-  rc=$?
-  set -e
-  err_output="$(cat "${pt_err_file}" 2>/dev/null || true)"
-  rm -f "${pt_err_file}"
-
-  # Self-heal: if nav failed AND the tab came from the sidecar (i.e. a stale
-  # ID from a previous run), clear it and retry once without the env-var so
-  # the server creates a fresh tab. Only trigger on errors that look like a
-  # dead-tab signal — keep genuine server errors (401, 403, etc.) unchanged.
-  if [[ ${rc} -ne 0 && ${pt_tab_from_sidecar} -eq 1 ]] \
-     && printf '%s\n%s' "${output}" "${err_output}" | grep -qiE 'tab.*not found|no such tab|tab .*does not exist'; then
-    rm -f "${PT_TAB_SIDECAR}"
-    # Rebuild the argv without the stale PINCHTAB_TAB env var.
-    args=(docker exec
-      -e "PINCHTAB_TOKEN=${PINCHTAB_TOKEN}"
-      -e "PINCHTAB_SERVER=${PINCHTAB_SERVER}"
-      "${PINCHTAB_CONTAINER}" pinchtab "$@")
-    pt_err_file="$(mktemp -t pt-nav-err.XXXXXX)"
-    set +e
-    output="$("${args[@]}" 2>"${pt_err_file}")"
-    rc=$?
-    set -e
-    err_output="$(cat "${pt_err_file}" 2>/dev/null || true)"
-    rm -f "${pt_err_file}"
-  fi
-
-  if [[ -n "${err_output}" ]]; then
-    printf '%s\n' "${err_output}" >&2
-  fi
-  printf '%s\n' "${output}"
-  if [[ ${rc} -ne 0 ]]; then
-    exit ${rc}
-  fi
-  tab="$(printf '%s' "${output}" | grep -oE '^[A-F0-9]{32}$' | head -1)"
-  if [[ -n "${tab}" ]]; then
-    printf '%s' "${tab}" > "${PT_TAB_SIDECAR}"
-  fi
-  exit 0
-fi
-
-# When closing the tab the sidecar points at, clear the sidecar so the next
-# command can't accidentally target a dead tab. Matches `pt tab close <id>`
-# (cobra subcommand form).
-if [[ "${1:-}" == "tab" && "${2:-}" == "close" && -n "${3:-}" && -f "${PT_TAB_SIDECAR}" ]]; then
-  stored="$(tr -d '[:space:]' < "${PT_TAB_SIDECAR}")"
-  if [[ "${stored}" == "${3}" ]]; then
-    rm -f "${PT_TAB_SIDECAR}"
-  fi
-fi
 
 exec "${args[@]}"

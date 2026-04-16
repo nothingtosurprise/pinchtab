@@ -31,29 +31,6 @@ Preferred tool surface:
 - Use `curl` for profile-management routes or non-shell/API fallback flows.
 - Use `jq` only when you need structured parsing from JSON responses.
 
-## Agent Identity And Attribution
-
-When multiple agents share one PinchTab server, always give each agent a stable ID.
-
-- CLI flows: prefer `pinchtab --agent-id <agent-id> ...`
-- long-running shells: set `PINCHTAB_AGENT_ID=<agent-id>`
-- raw HTTP flows: send `X-Agent-Id: <agent-id>` on requests that should be attributed to that agent
-
-That identity is recorded as `agentId` in activity events and powers:
-
-- scheduler task attribution when work is dispatched on behalf of an agent
-
-If you are switching between unrelated browser tasks, do not reuse the same agent ID unless you intentionally want one combined activity trail.
-
-## Safety Defaults
-
-- Default to `http://localhost` targets. Only use a remote PinchTab server when the user explicitly provides it and, if needed, a token.
-- Prefer read-only operations first: `text`, `snap -i -c`, `snap -d`, `find`, `click`, `fill`, `type`, `press`, `select`, `hover`, `scroll`.
-- Do not evaluate arbitrary JavaScript unless a simpler PinchTab command cannot answer the question.
-- Do not upload local files unless the user explicitly names the file to upload and the destination flow requires it.
-- Do not save screenshots, PDFs, or downloads to arbitrary paths. Use a user-specified path or a safe temporary/workspace path.
-- Never use PinchTab to inspect unrelated local files, browser secrets, stored credentials, or system configuration outside the task.
-
 ## Core Workflow
 
 Every PinchTab automation follows this pattern:
@@ -95,15 +72,7 @@ pinchtab fill "#email" "user@test.com"   # CSS
 pinchtab fill e3 "user@test.com"         # ref
 ```
 
-The same syntax works in the HTTP API via the `selector` field:
-
-```json
-{"kind": "click", "selector": "text:Sign In"}
-{"kind": "fill", "selector": "#email", "text": "user@test.com"}
-{"kind": "click", "selector": "e5"}
-```
-
-Legacy `ref` field is still accepted for backward compatibility.
+Same syntax in HTTP API via `selector` field. Legacy `ref` field still accepted.
 
 ## Command Chaining
 
@@ -144,29 +113,21 @@ pinchtab nav <url> --print-tab-id                   # Print only the new tabId o
 pinchtab back                                       # Navigate back in history
 pinchtab forward                                    # Navigate forward
 pinchtab reload                                     # Reload current page
-pinchtab tab                                        # List tabs (bare form; there is no `tab list` subcommand — `pinchtab tab list` returns 404)
+pinchtab tab                                        # List tabs (no subcommand - just `tab`)
 pinchtab tab <tab-id>                               # Focus an existing tab
 pinchtab tab new <url>                              # Open a new tab
 pinchtab tab close <tab-id>                         # Close a tab — use this to clean up stale tabs between runs
 pinchtab instance navigate <instance-id> <url>
 ```
 
-When stdout is a pipe (e.g. inside `$(...)`), `nav` automatically switches to
-`--print-tab-id` mode so agents can capture the tab ID with a single line,
-then export it once via `PINCHTAB_TAB` so every subsequent tab-scoped command
-picks it up without threading `--tab "$TAB"` through each call:
-
+**Tab workflow** - Capture tab ID once, reuse for all commands:
 ```bash
-# Capture once, reuse across every following command.
 export PINCHTAB_TAB=$(pinchtab nav http://example.com)
-pinchtab snap -i -c
-pinchtab eval "document.title"
-pinchtab click '#submit'
-pinchtab drag '#piece' '#zone-a'
+pinchtab snap -i -c    # Uses PINCHTAB_TAB automatically
+pinchtab click e5      # Same tab
+pinchtab text          # Same tab
 ```
-
-An explicit `--tab <id>` on any command still overrides `PINCHTAB_TAB`.
-See `references/env.md` for the full list of supported env vars.
+Priority: `--tab <id>` flag > `PINCHTAB_TAB` env var > active tab.
 
 ### Observation
 
@@ -181,7 +142,7 @@ pinchtab snap --text                                # Text output format
 pinchtab text                                       # Page text content (Readability-filtered; drops nav/repeated headlines)
 pinchtab text --full                                # Full page text (document.body.innerText) — use when Readability is dropping content you need
 pinchtab text --raw                                 # Alias of --full
-# `text` has no `--format` / `--plain` flag — `--full` / `--raw` are the only mode switches. The CLI returns JSON `{url, title, text, truncated}`; pipe through `| jq -r .text` if you want just the body.
+# CLI returns JSON; use `| jq -r .text` for plain text
 pinchtab find <query>                               # Semantic element search
 pinchtab find --ref-only <query>                    # Return refs only
 ```
@@ -219,9 +180,9 @@ pinchtab drag <selector> --drag-x <n> --drag-y <n>  # Single-step drag by pixel 
 pinchtab type <selector> <text>                     # Type with keystrokes
 pinchtab fill <selector> <text>                     # Set value directly
 pinchtab press <key>                                # Press key (Enter, Tab, Escape...)
-pinchtab hover <selector>                           # Hover element — dispatches a `mousemove`, which normal event listeners and CSS `:hover` receive. Sites that wire hover via inline `onmouseenter="..."` attributes usually still respond; if they don't, fall back to `pinchtab eval` calling the handler directly (e.g. `pt eval "showInfo(2)"`).
+pinchtab hover <selector>                           # Hover element
 pinchtab select <selector> <value|text>             # Select dropdown option by value attr, or fall back to visible text
-pinchtab scroll <pixels|direction|selector>         # Positional only — no `--y`/`--pixels`/`--delta-y` flag. Valid directions: up, down, left, right (800 px step). `top`/`bottom` are NOT direction keywords — scroll to a specific element (e.g. `'#footer'`) or pass an integer like `scroll 99999` to scroll far enough. Examples: `pinchtab scroll 1500`, `pinchtab scroll down`, `pinchtab scroll '#footer'`.
+pinchtab scroll <pixels|direction|selector>         # e.g. `scroll 1500`, `scroll down`, `scroll '#footer'`
 ```
 
 Rules:
@@ -231,8 +192,8 @@ Rules:
 - Prefer `click --wait-nav` when a click is expected to navigate.
 - Prefer low-level `mouse` commands only when normal `click` / `hover` abstractions are insufficient, such as drag handles, canvas widgets, or sites that depend on exact pointer sequences.
 - Re-snapshot immediately after `click`, `press Enter`, `select`, or `scroll` if the UI can change.
-- `select` takes whatever you have: it tries the `<option value="...">` attribute first, then exact (trimmed) visible text, then case-insensitive trimmed text, then case-insensitive substring of visible text (last resort, first match wins). So `pinchtab select '#country' uk`, `pinchtab select '#country' 'United Kingdom'`, and `pinchtab select '#theme' 'Dark'` (matches option "Dark Mode") all work; the form receives the real `value=...` attr in every case. If nothing matches, the server returns a clear error listing available options. Prefer exact forms when multiple options share a prefix.
-- If a click opens a JS dialog (`alert`, `confirm`, `prompt`), pass `"dialogAction": "accept"` or `"dialogAction": "dismiss"` on the click action body — or `pinchtab click <selector> --dialog-action accept` from the CLI (use `--dialog-text <str>` to supply a prompt response). The dialog is auto-handled in a single call. Without this, the click hangs until `/tabs/TAB_ID/dialog` is called from a parallel request, and a pending dialog wedges subsequent `/snapshot` and `/text` calls.
+- `select` matches by value attr first, then visible text (case-insensitive). Error lists available options if no match.
+- For JS dialogs: use `--dialog-action accept` or `--dialog-action dismiss` on click. Add `--dialog-text` for prompt responses.
 - For the `scroll` action via HTTP, use `"scrollX"` / `"scrollY"` for pixel deltas, or `"selector"` to scroll an element into view. Example: `{"kind":"scroll","scrollY":1500}` or `{"kind":"scroll","selector":"#footer"}`. The `x`/`y` fields are target viewport coordinates, not scroll deltas.
 - The download HTTP endpoint (`GET /download?url=...` or `GET /tabs/TAB_ID/download?url=...`) returns JSON `{contentType, data (base64), size, url}`, not raw bytes. Decode `data` with base64 to get the file. Only `http`/`https` URLs are allowed. Private/internal hosts are blocked unless listed in `security.downloadAllowedDomains`.
 
@@ -266,108 +227,26 @@ Rules:
 
 ### HTTP API fallback
 
-```bash
-curl -X POST http://localhost:9868/navigate \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com"}'
-
-curl "http://localhost:9868/snapshot?filter=interactive&format=compact"
-
-curl -X POST http://localhost:9868/action \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"fill","selector":"e3","text":"ada@example.com"}'
-
-curl http://localhost:9868/text
-
-## Instance-scoped solve (instance port, not server port)
-curl -X POST http://localhost:9868/solve \
-  -H "Content-Type: application/json" \
-  -d '{"maxAttempts": 3}'
-
-curl http://localhost:9868/solvers
-```
-
-Use the API when:
-
-- the agent cannot shell out,
-- profile creation or mutation is required,
-- or you need explicit instance- and tab-scoped routes.
+Use curl when CLI unavailable. Key endpoints on instance port (e.g. 9867):
+- `POST /navigate` with `{"url":"..."}`
+- `GET /snapshot?filter=interactive&format=compact`
+- `POST /action` with `{"kind":"fill","selector":"e3","text":"..."}`
+- `GET /text`
+- `POST /solve` with `{"maxAttempts": 3}`
 
 ### Tab-scoped HTTP API
 
-**Important:** Each `POST /navigate` creates a new tab by default. The default (non-tab-scoped) endpoints like `/snapshot`, `/action`, `/text` operate on the *active* tab, which may not be the one you just navigated. In multi-tab workflows, always use tab-scoped routes to avoid acting on the wrong page.
+Use `/tabs/TAB_ID/...` routes to target specific tabs. Get tab ID from navigate response or `GET /tabs`.
 
-Get the tab ID from the navigate response or from `GET /tabs`.
+Pattern: `curl -H "Authorization: Bearer <token>" http://localhost:9867/tabs/TAB_ID/<endpoint>`
 
-```bash
-# List all tabs
-curl http://localhost:9867/tabs \
-  -H "Authorization: Bearer <token>"
+Key endpoints: `navigate`, `snapshot`, `text`, `action`, `screenshot`, `pdf`, `back`, `forward`, `close`, `wait`, `download`, `upload`, `handoff`, `resume`.
 
-# Navigate in a specific tab (does not create a new tab)
-curl -X POST http://localhost:9867/tabs/TAB_ID/navigate \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com"}'
-
-# Snapshot a specific tab
-curl "http://localhost:9867/tabs/TAB_ID/snapshot?filter=interactive&format=compact" \
-  -H "Authorization: Bearer <token>"
-
-# Get text from a specific tab
-curl http://localhost:9867/tabs/TAB_ID/text \
-  -H "Authorization: Bearer <token>"
-
-# Perform action on a specific tab
-curl -X POST http://localhost:9867/tabs/TAB_ID/action \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"click","selector":"#submit-btn"}'
-
-# Low-level pointer action on a specific tab
-curl -X POST http://localhost:9867/tabs/TAB_ID/action \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mouse-wheel","x":400,"y":320,"deltaY":240}'
-
-# Drag action: selector + pixel OFFSETS (dragX, dragY), not absolute endpoints.
-# For low-level absolute coords, sequence mouse-down / mouse-move / mouse-up.
-curl -X POST http://localhost:9867/tabs/TAB_ID/action \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"drag","selector":"#piece","dragX":12,"dragY":-158}'
-
-# Navigate back/forward in a specific tab
-curl -X POST http://localhost:9867/tabs/TAB_ID/back \
-  -H "Authorization: Bearer <token>"
-curl -X POST http://localhost:9867/tabs/TAB_ID/forward \
-  -H "Authorization: Bearer <token>"
-
-# Screenshot (GET, not POST)
-curl http://localhost:9867/tabs/TAB_ID/screenshot \
-  -H "Authorization: Bearer <token>" \
-  --output screenshot.png
-
-# PDF export (GET or POST)
-curl http://localhost:9867/tabs/TAB_ID/pdf \
-  -H "Authorization: Bearer <token>" \
-  --output page.pdf
-
-# Close a tab
-curl -X POST http://localhost:9867/tabs/TAB_ID/close \
-  -H "Authorization: Bearer <token>"
-
-# Handoff for human step: POST /tabs/TAB_ID/handoff with {"reason":"captcha","timeoutMs":120000}
-# Resume: POST /tabs/TAB_ID/resume with {"status":"completed"}
-```
-
-**Navigation with `waitNav`:** When clicking a link or button that triggers page navigation, include `"waitNav": true` in the action body. Without it, PinchTab returns a `navigation_changed` error to protect against unexpected navigation during form interactions.
-
-```json
-{"kind": "click", "selector": "#search-btn", "waitNav": true}
-```
-
-All tab-scoped routes follow the pattern `/tabs/{TAB_ID}/...` and mirror the default endpoints. The full list includes: `navigate`, `back`, `forward`, `reload`, `snapshot`, `screenshot`, `text`, `pdf`, `action`, `actions`, `dialog`, `wait`, `find`, `lock`, `unlock`, `cookies`, `metrics`, `network`, `solve`, `close`, `storage`, `evaluate`, `download`, `upload`, `handoff`, and `resume`.
+Action examples:
+- Click: `{"kind":"click","selector":"#btn"}`
+- Click with nav: `{"kind":"click","selector":"#link","waitNav":true}`
+- Drag: `{"kind":"drag","selector":"#piece","dragX":12,"dragY":-158}`
+- Scroll: `{"kind":"scroll","scrollY":1500}` or `{"kind":"scroll","selector":"#footer"}`
 
 ## Common Patterns
 
@@ -377,13 +256,9 @@ All tab-scoped routes follow the pattern `/tabs/{TAB_ID}/...` and mirror the def
 
 **Form submission:** Always click the submit button — never use `press Enter`.
 
-## Security and Token Economy
+## Token Economy
 
-- Use a dedicated automation profile, not a daily browsing profile.
-- If PinchTab is reachable off-machine, require a token and bind conservatively.
-- Prefer `text`, `snap -i -c`, and `snap -d` before screenshots, PDFs, eval, downloads, or uploads.
-- Use `--block-images` for read-heavy tasks that do not need visual assets.
-- Stop or isolate instances when switching between unrelated accounts or environments.
+Prefer low-token commands: `text`, `snap -i -c`, `snap -d`. Use `--block-images` for read-heavy tasks. Reserve screenshots/PDFs for visual verification.
 
 ## Diffing and Verification
 
