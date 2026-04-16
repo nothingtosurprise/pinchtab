@@ -213,3 +213,34 @@ pt_ok eval "document.querySelector('#username').value"
 assert_json_field ".result" "$LONG_TEXT" "long string typed correctly"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pinchtab wait --not-text (immediate, absent)"
+
+# Text that never existed — should succeed immediately.
+pt_ok nav "${FIXTURES_URL}/buttons.html"
+pt_ok wait --not-text "nonexistent-text-xyz" --timeout 2000
+assert_output_contains "waited" "wait response present"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pinchtab wait --not-text (after DOM change)"
+
+# Toggle click hides #toggle-content (display:none removes innerText).
+pt_ok nav "${FIXTURES_URL}/buttons.html"
+pt_ok click --css "#toggle-btn"
+pt_ok wait --not-text "This content can be toggled." --timeout 5000
+assert_output_contains "waited" "wait returned after text disappeared"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pinchtab wait --not-text (timeout when text persists)"
+
+# Text stays on page — command should return (200) with waited=false.
+pt_ok nav "${FIXTURES_URL}/buttons.html"
+pt_ok wait --not-text "Increment" --timeout 500
+assert_output_contains "timeout" "timeout reported when text persists"
+
+end_test

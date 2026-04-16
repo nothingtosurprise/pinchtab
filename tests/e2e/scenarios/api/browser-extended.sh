@@ -262,6 +262,47 @@ assert_ok "wait for text"
 end_test
 
 # ─────────────────────────────────────────────────────────────────
+start_test "POST /wait: wait for text to disappear (not-text immediate)"
+
+pt_post /navigate "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+assert_ok "navigate"
+
+# Text that isn't present — should succeed immediately
+pt_post /wait '{"notText":"nonexistent-text-xyz","timeout":2000}'
+assert_ok "wait for not-text (absent)"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /wait: wait for text to disappear (after toggle)"
+
+pt_post /navigate "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+assert_ok "navigate"
+
+# Click toggle to hide the content (display: none removes from innerText)
+pt_post /action '{"kind":"click","selector":"#toggle-btn"}'
+assert_ok "click toggle button"
+
+# Wait for the toggled text to disappear
+pt_post /wait '{"notText":"This content can be toggled.","timeout":5000}'
+assert_ok "wait for toggled text to disappear"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "POST /wait: not-text timeout when text persists"
+
+pt_post /navigate "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+assert_ok "navigate"
+
+# Text is present and never removed — should time out
+pt_post /wait '{"notText":"Increment","timeout":500}'
+assert_ok "wait returns 200 with timeout error"
+assert_json_eq "$RESULT" '.waited' 'false' "waited=false on timeout"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
 start_test "POST /wait: invalid request (empty body)"
 
 pt_post /wait '{}'
