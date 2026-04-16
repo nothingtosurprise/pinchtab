@@ -210,7 +210,8 @@ elif [[ "${BENCHMARK_TYPE}" == "agent-browser" ]]; then
     fi
 fi
 
-# Create step entry
+# Create step entry — only include metric fields when they have real values.
+# Zero-value tokens/cost/bytes/tool_calls are omitted to reduce noise.
 STEP_JSON=$(jq -n \
     --argjson group "${GROUP}" \
     --argjson step "${STEP}" \
@@ -225,16 +226,16 @@ STEP_JSON=$(jq -n \
     --arg answer "${ANSWER}" \
     --arg notes "${NOTES}" \
     --arg ts "${TIMESTAMP}" \
-    '{group: $group, step: $step, id: $id, status: $status,
-      input_tokens: $in_tokens, output_tokens: $out_tokens,
-      total_tokens: $total_tokens,
-      tool_calls: $tool_calls,
-      cost_usd: $cost,
-      response_bytes: $bytes, answer: $answer,
-      notes: $notes, timestamp: $ts} |
-     if $status == "answer" then
-       .verification = {status: "pending"}
-     else . end')
+    '{group: $group, step: $step, id: $id, status: $status, timestamp: $ts} |
+     if ($answer | length) > 0 then .answer = $answer else . end |
+     if ($notes | length) > 0 then .notes = $notes else . end |
+     if $in_tokens > 0 then .input_tokens = $in_tokens else . end |
+     if $out_tokens > 0 then .output_tokens = $out_tokens else . end |
+     if $total_tokens > 0 then .total_tokens = $total_tokens else . end |
+     if $tool_calls > 0 then .tool_calls = $tool_calls else . end |
+     if $cost > 0 then .cost_usd = $cost else . end |
+     if $bytes > 0 then .response_bytes = $bytes else . end |
+     if $status == "answer" then .verification = {status: "pending"} else . end')
 
 # Append to report and update totals
 TMP_FILE=$(mktemp)

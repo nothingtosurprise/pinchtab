@@ -75,9 +75,9 @@ Check that the PinchTab server is healthy.
 **Verify**: Server responds with `status: ok`.
 
 ### 0.2 Auth is required
-Make a request to the server WITHOUT an auth token and confirm it is rejected.
+Make a request to the server with a **wrong** token (`PINCHTAB_TOKEN=wrong-token ./scripts/pt health`) and confirm it is rejected. The `pt` wrapper always injects the benchmark token by default, so you must explicitly override it to test auth rejection.
 
-**Verify**: Response is HTTP 401 (or other auth-error status).
+**Verify**: Response is HTTP 401 or contains `unauthorized`.
 
 ### 0.3 Auth works with token
 Repeat the same request WITH the bearer token and confirm it succeeds.

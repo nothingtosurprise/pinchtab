@@ -45,6 +45,21 @@ if [[ -z "${REPORT_FILE}" || ! -f "${REPORT_FILE}" ]]; then
   exit 1
 fi
 
+# Auto-verify pending agent answers before rendering the summary.
+# This ensures the "Verification Pass Rate" in the summary reflects actual
+# grading, not just the answer count. For baseline reports (which use
+# pass/fail directly) this is a no-op.
+PENDING=$(jq -r '.totals.steps_pending_verification // 0' "${REPORT_FILE}")
+if [[ "${PENDING}" -gt 0 ]]; then
+  VERIFY_SCRIPT="${SCRIPT_DIR}/verify-answers.sh"
+  if [[ -x "${VERIFY_SCRIPT}" ]]; then
+    echo "Auto-verifying ${PENDING} pending answers..."
+    "${VERIFY_SCRIPT}" "${REPORT_FILE}"
+  else
+    echo "WARNING: ${PENDING} answers pending verification but verify-answers.sh not found"
+  fi
+fi
+
 SUMMARY_FILE="${REPORT_FILE%.json}_summary.md"
 
 jq -r '

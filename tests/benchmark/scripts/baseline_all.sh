@@ -18,6 +18,18 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 AUTH="Authorization: Bearer benchmark-token"
 BASE="http://localhost:9867"
 REC() { ./scripts/record-step.sh --type baseline "$@" > /dev/null; }
+
+# VERIFY_MARKER <group> <step> <text> <marker> ["extra notes"]
+# Grep for the marker in the text; record pass with the marker as evidence
+# (so the verifier can audit baseline results), or fail with what was expected.
+VERIFY_MARKER() {
+  local g="$1" s="$2" text="$3" marker="$4" extra="${5:-}"
+  if printf '%s' "$text" | grep -q "$marker"; then
+    REC "$g" "$s" pass "${marker}${extra:+ $extra}"
+  else
+    REC "$g" "$s" fail "expected $marker"
+  fi
+}
 NAV() { curl -sf -X POST "$BASE/navigate" -H "$AUTH" -H "Content-Type: application/json" -d "{\"tabId\":\"$T\",\"url\":\"$1\"}" > /dev/null; }
 SNAP() { curl -sf "$BASE/tabs/$T/snapshot?format=compact&maxTokens=${2:-1500}" -H "$AUTH"; }
 ACT() { curl -sf -X POST "$BASE/tabs/$T/action" -H "$AUTH" -H "Content-Type: application/json" -d "$1"; }
@@ -39,22 +51,22 @@ R=$(curl -sf "$BASE/tabs" -H "$AUTH"); echo "$R" | grep -q "$T" && REC 0 8 pass 
 
 # Group 1
 NAV "http://fixtures/wiki.html"; S=$(SNAP "" 1500)
-echo "$S" | grep -q "VERIFY_WIKI_INDEX_55555" && echo "$S" | grep -q "COUNT_LANGUAGES_12" && REC 1 1 pass "wiki" || REC 1 1 fail "miss"
-R=$(ACT '{"kind":"click","selector":"#link-go","waitNav":true}'); echo "$R" | grep -q '"success":true' && REC 1 2 pass "click" || REC 1 2 fail "miss"
-S=$(SNAP "" 2000); echo "$S" | grep -q "VERIFY_WIKI_GO_LANG_88888" && REC 1 3 pass "go" || REC 1 3 fail "miss"
-echo "$S" | grep -q "FEATURE_COUNT_6" && REC 1 4 pass "6" || REC 1 4 fail "miss"
-NAV "http://fixtures/articles.html"; S=$(SNAP "" 2000); echo "$S" | grep -q "Artificial Intelligence" && REC 1 5 pass "heads" || REC 1 5 fail "miss"
-NAV "http://fixtures/dashboard.html"; S=$(SNAP "" 2000); echo "$S" | grep -q '1,284,930' && REC 1 6 pass "metrics" || REC 1 6 fail "miss"
+if echo "$S" | grep -q "VERIFY_WIKI_INDEX_55555" && echo "$S" | grep -q "COUNT_LANGUAGES_12"; then REC 1 1 pass "VERIFY_WIKI_INDEX_55555 COUNT_LANGUAGES_12"; else REC 1 1 fail "expected VERIFY_WIKI_INDEX_55555 + COUNT_LANGUAGES_12"; fi
+R=$(ACT '{"kind":"click","selector":"#link-go","waitNav":true}'); echo "$R" | grep -q '"success":true' && REC 1 2 pass "clicked #link-go waitNav" || REC 1 2 fail "click failed"
+S=$(SNAP "" 2000); VERIFY_MARKER 1 3 "$S" "VERIFY_WIKI_GO_LANG_88888"
+VERIFY_MARKER 1 4 "$S" "FEATURE_COUNT_6"
+NAV "http://fixtures/articles.html"; S=$(SNAP "" 2000); VERIFY_MARKER 1 5 "$S" "Artificial Intelligence"
+NAV "http://fixtures/dashboard.html"; S=$(SNAP "" 2000); VERIFY_MARKER 1 6 "$S" "1,284,930"
 
 # Group 2
 NAV "http://fixtures/wiki.html"; ACT '{"kind":"fill","selector":"#wiki-search-input","text":"golang"}' > /dev/null
 ACT '{"kind":"click","selector":"#wiki-search-btn","waitNav":true}' > /dev/null
-S=$(SNAP "" 2000); echo "$S" | grep -q "VERIFY_WIKI_GO_LANG_88888" && REC 2 1 pass "search" || REC 2 1 fail "miss"
+S=$(SNAP "" 2000); VERIFY_MARKER 2 1 "$S" "VERIFY_WIKI_GO_LANG_88888"
 NAV "http://fixtures/search.html"; ACT '{"kind":"fill","selector":"#search-input","text":"xyznonexistent"}' > /dev/null
 ACT '{"kind":"click","selector":"#search-btn"}' > /dev/null; REC 2 2 pass "no-res"
 NAV "http://fixtures/search.html"; ACT '{"kind":"fill","selector":"#search-input","text":"artificial intelligence"}' > /dev/null
 ACT '{"kind":"click","selector":"#search-btn"}' > /dev/null
-S=$(SNAP "" 1000); echo "$S" | grep -q "Artificial Intelligence" && REC 2 3 pass "ai" || REC 2 3 fail "miss"
+S=$(SNAP "" 1000); VERIFY_MARKER 2 3 "$S" "Artificial Intelligence"
 
 # Group 3
 NAV "http://fixtures/form.html"
@@ -67,7 +79,7 @@ ACT '{"kind":"fill","selector":"#message","text":"This is a benchmark test messa
 ACT '{"kind":"click","selector":"#newsletter"}' > /dev/null
 ACT '{"kind":"click","selector":"input[name=priority][value=high]"}' > /dev/null
 ACT '{"kind":"click","selector":"#submit-btn"}' > /dev/null
-S=$(SNAP "" 1000); echo "$S" | grep -q "VERIFY_FORM_SUBMITTED_SUCCESS" && REC 3 1 pass "form" || REC 3 1 fail "miss"
+S=$(SNAP "" 1000); VERIFY_MARKER 3 1 "$S" "VERIFY_FORM_SUBMITTED_SUCCESS"
 curl -sf "$BASE/tabs/$T/snapshot?filter=interactive&format=compact" -H "$AUTH" > /dev/null; REC 3 2 pass "interactive"
 
 # Group 4
@@ -95,7 +107,7 @@ ACT '{"kind":"click","selector":"#product-1 .add-to-cart"}' > /dev/null
 ACT '{"kind":"click","selector":"#product-2 .add-to-cart"}' > /dev/null
 S=$(SNAP "" 1000); echo "$S" | grep -q "CART_ITEM_WIRELESS_HEADPHONES" && REC 6 2 pass "cart" || REC 6 2 fail "miss"
 ACT '{"kind":"click","selector":"#checkout-btn"}' > /dev/null
-S=$(SNAP "" 2000); echo "$S" | grep -q "VERIFY_CHECKOUT_SUCCESS_ORDER" && REC 6 3 pass "co" || REC 6 3 fail "miss"
+S=$(SNAP "" 2000); VERIFY_MARKER 6 3 "$S" "VERIFY_CHECKOUT_SUCCESS_ORDER"
 
 # Group 7
 NAV "http://fixtures/wiki-go.html"; S1=$(SNAP "" 2000)
@@ -128,14 +140,14 @@ NAV "http://fixtures/dashboard.html"; ACT '{"kind":"click","selector":"#settings
 S=$(SNAP "" 3000); echo "$S" | grep -q "Dashboard Settings" && REC 10 1 pass "m" || REC 10 1 fail "miss"
 ACT '{"kind":"select","selector":"#theme-select","value":"dark"}' > /dev/null
 ACT '{"kind":"click","selector":"#modal-save"}' > /dev/null
-S=$(SNAP "" 3000); echo "$S" | grep -q "THEME_DARK_APPLIED" && REC 10 2 pass "d" || REC 10 2 fail "miss"
+S=$(SNAP "" 3000); VERIFY_MARKER 10 2 "$S" "THEME_DARK_APPLIED"
 
 # Group 11
 NAV "http://fixtures/spa.html?reset=1"
 ACT '{"kind":"fill","selector":"#new-task-input","text":"Persistent Task Test"}' > /dev/null
 ACT '{"kind":"click","selector":"#add-task-btn"}' > /dev/null
 NAV "http://fixtures/"; NAV "http://fixtures/spa.html"
-S=$(SNAP "" 1500); echo "$S" | grep -q "TASK_PERSISTENT_TEST_FOUND" && REC 11 1 pass "p" || REC 11 1 fail "miss"
+S=$(SNAP "" 1500); VERIFY_MARKER 11 1 "$S" "TASK_PERSISTENT_TEST_FOUND"
 NAV "http://fixtures/login.html"
 for act in \
   '{"kind":"fill","selector":"#username","text":"benchmark"}' \
@@ -174,7 +186,7 @@ S=$(SNAP "" 1000); echo "$S" | grep -q "VERIFY_FORM_SUBMITTED_SUCCESS" && REC 13
 
 # Group 14
 NAV "http://fixtures/ecommerce.html"; ACT '{"kind":"click","selector":"#load-more-btn"}' > /dev/null
-S=$(SNAP "" 2000); echo "$S" | grep -q "ADDITIONAL_PRODUCTS_LOADED" && REC 14 1 pass "m" || REC 14 1 fail "miss"
+S=$(SNAP "" 2000); VERIFY_MARKER 14 1 "$S" "ADDITIONAL_PRODUCTS_LOADED"
 ACT '{"kind":"click","selector":"#product-5 .add-to-cart"}' > /dev/null
 S=$(SNAP "" 1000); echo "$S" | grep -q "CART_UPDATED_WITH_LAZY_PRODUCT" && REC 14 2 pass "l" || REC 14 2 fail "miss"
 
@@ -187,15 +199,15 @@ echo "$G" | grep -q "FEATURE_COUNT_6" && echo "$P" | grep -q "FEATURE_COUNT_7" &
 
 # Group 16
 NAV "http://fixtures/hovers.html"; ACT '{"kind":"hover","selector":"#avatar-1"}' > /dev/null
-S=$(SNAP "" 1000); echo "$S" | grep -q "HOVER_REVEALED_USER_1" && REC 16 1 pass "1" || REC 16 1 fail "miss"
+S=$(SNAP "" 1000); VERIFY_MARKER 16 1 "$S" "HOVER_REVEALED_USER_1"
 ACT '{"kind":"hover","selector":"#avatar-2"}' > /dev/null
-S=$(SNAP "" 1000); echo "$S" | grep -q "HOVER_REVEALED_USER_2" && REC 16 2 pass "2" || REC 16 2 fail "miss"
+S=$(SNAP "" 1000); VERIFY_MARKER 16 2 "$S" "HOVER_REVEALED_USER_2"
 
 # Group 17
 NAV "http://fixtures/scroll.html"; ACT '{"kind":"scroll","scrollY":1500}' > /dev/null
-S=$(SNAP "" 1500); echo "$S" | grep -q "SCROLL_MIDDLE_MARKER" && REC 17 1 pass "m" || REC 17 1 fail "miss"
+S=$(SNAP "" 1500); VERIFY_MARKER 17 1 "$S" "SCROLL_MIDDLE_MARKER"
 ACT '{"kind":"scroll","selector":"#footer"}' > /dev/null
-S=$(SNAP "" 1500); echo "$S" | grep -q "SCROLL_REACHED_FOOTER" && REC 17 2 pass "f" || REC 17 2 fail "miss"
+S=$(SNAP "" 1500); VERIFY_MARKER 17 2 "$S" "SCROLL_REACHED_FOOTER"
 
 # Group 18
 R=$(curl -sf "$BASE/tabs/$T/download?url=http://fixtures/download-sample.txt" -H "$AUTH")

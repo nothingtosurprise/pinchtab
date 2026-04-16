@@ -7,7 +7,9 @@
 set -euo pipefail
 
 : "${PINCHTAB_CONTAINER:=benchmark-pinchtab-1}"
-: "${PINCHTAB_TOKEN:=benchmark-token}"
+# Use = (not :=) for TOKEN so that PINCHTAB_TOKEN="" sends no auth header —
+# needed for step 0.2 which tests unauthenticated access (401 expected).
+: "${PINCHTAB_TOKEN=benchmark-token}"
 : "${PINCHTAB_SERVER:=http://localhost:9867}"
 
 args=(docker exec
