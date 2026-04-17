@@ -1,0 +1,152 @@
+Work in this repo: /sessions/eager-determined-cannon/mnt/pinchtab
+
+Benchmark lane: agent-browser execution.
+
+Requirements:
+- Follow a linear execution flow: skill once, selected groups, execute, record, verify, continue.
+- Do not read README, browse directories, or inspect unrelated files unless a command path is missing.
+- Read /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/setup-agent-browser.md exactly once before acting, then load the official agent-browser skill exactly once with `./scripts/ab skills get agent-browser --full`.
+- Tool wrapper:
+  - ./scripts/ab
+- Workflow summary:
+  - use only ./scripts/ab for browser actions
+  - keep the shared benchmark session across commands
+  - use snapshot -i -c for actionable refs
+  - use fresh refs after any navigation or DOM change
+  - reuse the current browser state instead of reopening pages unless needed
+- Adapter notes:
+  - after navigation-triggering clicks, verify the resulting page with a fresh snapshot/text read instead of trusting the click response alone
+  - do not assume every command returns JSON; parse only when the command actually returned JSON
+  - for downloads, inspect returned content instead of assuming a file already exists locally
+  - this environment uses BSD/macOS userland tools; avoid GNU-only flags such as "head -n -1"
+- Task scope:
+  Use only this selected task subset for agent-browser: Group 0 from /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/setup-agent-browser.md, Groups 1+ from /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/benchmark-run.
+  
+  # Benchmark Run
+  
+  Natural-language benchmark task set for the agent-driven lanes.
+  
+  Read this index first, then read the relevant group files.
+  
+  ## How to use this directory
+  
+  - `setup-pinchtab.md` and `setup-agent-browser.md` define lane-specific setup, wrapper usage, recording, and Group 0 behavior.
+  - This directory defines the shared task groups.
+  - Each group lives in its own file: `group-00.md` through `group-38.md`.
+  - When running a subset, read only the selected group files.
+  - When running the full suite, proceed in numeric order.
+  
+  ## Group Files
+  
+  - `group-00.md` — Setup & Diagnosis
+  - `group-01.md` — Reading & Extracting Real Content
+  - `group-02.md` — Search & Dynamic Interaction
+  - `group-03.md` — Complex Form
+  - `group-04.md` — SPA State Management
+  - `group-05.md` — Login Flow
+  - `group-06.md` — Multi-Step E-commerce
+  - `group-07.md` — Content + Interaction Combined
+  - `group-08.md` — Error Handling
+  - `group-09.md` — Export
+  - `group-10.md` — Nested Interactions & Modal Dialogs
+  - `group-11.md` — State Persistence & Page Reload
+  - `group-12.md` — Multi-Page Navigation & Back Button
+  - `group-13.md` — Form State & Multi-Step Submission
+  - `group-14.md` — Dynamic Content Loading
+  - `group-15.md` — Complex Data Extraction & Aggregation
+  - `group-16.md` — Hover & Tooltips
+  - `group-17.md` — Scrolling
+  - `group-18.md` — File Download
+  - `group-19.md` — iFrame
+  - `group-20.md` — Dialogs
+  - `group-21.md` — Async / awaitPromise
+  - `group-22.md` — Mouse Drag & Drop
+  - `group-23.md` — Async / Loading state
+  - `group-24.md` — Keyboard events
+  - `group-25.md` — Tab panels
+  - `group-26.md` — Accordion
+  - `group-27.md` — Contenteditable editor
+  - `group-28.md` — Range slider
+  - `group-29.md` — Pagination
+  - `group-30.md` — Custom dropdown menu
+  - `group-31.md` — Nested iframes (3 levels deep)
+  - `group-32.md` — Dynamic iframe (inserted after load)
+  - `group-33.md` — srcdoc iframe
+  - `group-34.md` — Sandboxed iframe
+  - `group-35.md` — Long-form article (Medium/Substack style)
+  - `group-36.md` — Search results page (SERP)
+  - `group-37.md` — Q&A thread (Stack-Overflow style)
+  - `group-38.md` — Pricing table
+  
+  ## Group 0: Setup & Diagnosis (agent-browser lane)
+  
+  ### 0.1 Open fixtures home
+  Run `./scripts/ab open http://fixtures/`.
+  
+  **Verify**: Open succeeds and the home page loads.
+  
+  ### 0.2 Snapshot interactive refs
+  Run `./scripts/ab snapshot -i -c` on the home page.
+  
+  **Verify**: Interactive refs are returned without error.
+  
+  ### 0.3 Session persists across commands
+  Use the same wrapper session across multiple commands and confirm browser state persists.
+  
+  **Verify**: A follow-up action can use the existing page/session state.
+  
+  # Group 1: Reading & Extracting Real Content
+  
+  ### 1.1 Get the full list of categories from the wiki index
+  Navigate to `http://fixtures/wiki.html` and extract all category names with their article counts.
+  
+  **Verify**: Can name at least 2 categories and their article counts (e.g. "Programming Languages: 12 articles").
+  
+  ### 1.2 Navigate by clicking a link
+  From the wiki index, click the "Go (programming language)" link to navigate to the Go article.
+  
+  **Verify**: You are now on the Go article page (not the wiki index).
+  
+  ### 1.3 Extract structured data from a table
+  On the Go article, read the infobox table and answer: Who designed Go, and what year did it first appear?
+  
+  **Verify**: Answer contains "Robert Griesemer" (or "Rob Pike" or "Ken Thompson") and "2009".
+  
+  ### 1.4 Count list items
+  On the Go article, count how many key features are listed.
+  
+  **Verify**: Answer is 6 (verify against `FEATURE_COUNT_6`).
+  
+  ### 1.5 Read all article headlines from articles page
+  Navigate to `http://fixtures/articles.html` and list all article titles.
+  
+  **Verify**: Found at least 3 articles including "The Future of Artificial Intelligence".
+  
+  ### 1.6 Read dashboard metrics
+  Navigate to `http://fixtures/dashboard.html` and extract: Total Users, Revenue, and Conversion Rate.
+  
+  **Verify**: Found `24,582` users AND `$1,284,930` revenue.
+  
+  ---
+- For each completed step:
+  1. record the observed answer with:
+  - ./scripts/record-step.sh --report-file /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/results/golden_report.json --type agent-browser <group> <step> answer "<what you saw>" "notes"
+  2. immediately verify it with:
+  - ./scripts/verify-step.sh --report-file /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/results/golden_report.json --type agent-browser <group> <step> <pass|fail|skip> "verification notes"
+- If a step cannot be completed, record fail or skip in the same report.
+- Do not leave answered steps pending verification.
+- Keep commands concise. Prefer rg/sed/cat only when you must inspect a specific file.
+- After the skill step, begin actual benchmark execution immediately.
+- Start with this bootstrap command sequence before attempting the selected steps:
+1. ./scripts/ab skills get agent-browser --full
+2. ./scripts/ab open http://fixtures/
+3. ./scripts/ab snapshot -i -c
+- After the bootstrap, immediately execute Group 0 step 1.
+- Subset selection:
+  - Execute only these benchmark groups: 0, 1.
+  - Do not attempt groups outside this subset.
+  - Treat all other groups as out of scope for this run rather than as failures.
+  - For the selected groups, execute every step in the group unless blocked.
+- Finish when all selected steps are executed or when you are blocked.
+
+Your final answer should briefly summarize completion status and the main blockers, if any.

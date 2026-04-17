@@ -4,7 +4,7 @@
 # step.
 #
 # Usage:
-#   ./verify-step.sh [--type baseline|agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> "notes"
+#   ./verify-step.sh [--type baseline|pinchtab|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> "notes"
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ while [[ $# -gt 0 && "$1" == --* ]]; do
 done
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 [--type baseline|agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> [notes]"
+  echo "Usage: $0 [--type baseline|pinchtab|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip> [notes]"
   exit 1
 fi
 
@@ -70,7 +70,7 @@ if [[ -z "${REPORT_FILE}" ]]; then
         REPORT_FILE="$(resolve_current_report "${CURRENT_BASELINE_PTR}" || true)"
         [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/baseline_*.json 2>/dev/null | head -1)
         ;;
-      agent)
+      pinchtab|agent)
         REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_PTR}" || true)"
         [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_benchmark_*.json 2>/dev/null | head -1)
         ;;
@@ -79,7 +79,7 @@ if [[ -z "${REPORT_FILE}" ]]; then
         [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json 2>/dev/null | head -1)
         ;;
       *)
-        echo "ERROR: --type must be 'baseline', 'agent', or 'agent-browser'"
+        echo "ERROR: --type must be 'baseline', 'pinchtab', or 'agent-browser'"
         exit 1
         ;;
     esac

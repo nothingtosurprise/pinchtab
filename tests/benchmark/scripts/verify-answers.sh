@@ -3,7 +3,7 @@
 # One-off verifier for Loop #31 answers. Reads the agent report, matches each
 # step's `.answer` against an expected marker/substring set, and invokes
 # verify-step.sh with pass/fail. The marker map below is hand-derived from
-# BASELINE_TASKS.md "Pass if" criteria.
+# the baseline benchmark oracle implemented in scripts/baseline.sh.
 #
 # Usage:
 #   ./verify_answers_for_loop31.sh results/agent_benchmark_20260415_233421.json

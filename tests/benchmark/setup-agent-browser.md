@@ -1,12 +1,30 @@
-# Agent Browser Instructions
+# Agent Browser Setup
 
-These are benchmark-specific instructions for running the `agent-browser` lane.
-They are not the official `agent-browser` skill. For the live CLI skill, load it
-through the benchmark wrapper:
+Lane-specific setup and operating guidance for running the benchmark with
+`agent-browser`.
+
+## Read Order
+
+1. Read `./benchmark-run/index.md`
+2. Load the live skill through the wrapper:
 
 ```bash
 ./scripts/ab skills get agent-browser --full
 ```
+
+This file covers setup, wrapper usage, and Group 0 differences. Shared task
+groups live in `benchmark-run/`.
+
+## Recording
+
+Record each completed step as factual `answer`, `fail`, or `skip`, then verify:
+
+```bash
+./scripts/record-step.sh --type agent-browser <group> <step> answer "<what you saw>" "notes"
+./scripts/verify-step.sh --type agent-browser <group> <step> <pass|fail|skip> "verification notes"
+```
+
+Do not self-grade inside the answer payload. Keep the answer factual.
 
 ## Wrapper
 
@@ -65,6 +83,8 @@ cd tests/benchmark
 - Fixtures: `http://fixtures/`
 - Session name: `benchmark` by default (`AGENT_BROWSER_SESSION` overrides)
 - Browser driver: Docker service `agent-browser`
+- Pages: `/`, `/wiki.html`, `/wiki-go.html`, `/articles.html`, `/search.html`,
+  `/form.html`, `/dashboard.html`, `/ecommerce.html`, `/spa.html`, `/login.html`
 
 ## Operating Guidance
 
@@ -73,3 +93,13 @@ cd tests/benchmark
 - Prefer refs from `snapshot -i -c` over brittle selectors
 - Re-snapshot after navigation or any DOM-changing action
 - Keep one session for the whole benchmark lane unless a task explicitly needs a reset
+
+## Group 0 Override
+
+For the `agent-browser` lane, Group 0 differs from `benchmark-run/group-00.md`:
+
+- 0.1 `./scripts/ab open http://fixtures/` succeeds
+- 0.2 `./scripts/ab snapshot -i -c` returns interactive refs
+- 0.3 session state persists across multiple `./scripts/ab ...` commands
+
+From Group 1 onward, use `benchmark-run/group-01.md` through `benchmark-run/group-38.md`.

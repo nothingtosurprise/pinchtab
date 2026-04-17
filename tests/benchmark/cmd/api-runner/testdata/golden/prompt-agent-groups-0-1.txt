@@ -1,0 +1,180 @@
+Work in this repo: /sessions/eager-determined-cannon/mnt/pinchtab
+
+Benchmark lane: PinchTab agent execution.
+
+Requirements:
+- Follow a linear execution flow: skill once, selected groups, execute, record, verify, continue.
+- Do not read README, browse directories, or inspect unrelated files unless a command path is missing.
+- Read /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/setup-pinchtab.md exactly once before acting.
+- Tool wrapper:
+  - ./scripts/pt
+- Workflow summary:
+  - use only ./scripts/pt for browser actions
+  - keep one shared tab via PINCHTAB_TAB
+  - use snap -i -c for actionable refs
+  - use text or text --full for reading content
+  - refresh refs after any navigation or DOM change
+- Adapter notes:
+  - a navigation-expected click can return "Error 409: unexpected page navigation ..."; treat that as likely success and verify with a fresh snapshot/text read
+  - do not assume every command returns JSON; only parse JSON when the command actually returned JSON
+  - the download endpoint returns JSON with base64 content in "data", not a local file path
+  - this environment uses BSD/macOS userland tools; avoid GNU-only flags such as "head -n -1"
+- Task scope:
+  Use only this selected task subset from /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/benchmark-run:
+  
+  # Benchmark Run
+  
+  Natural-language benchmark task set for the agent-driven lanes.
+  
+  Read this index first, then read the relevant group files.
+  
+  ## How to use this directory
+  
+  - `setup-pinchtab.md` and `setup-agent-browser.md` define lane-specific setup, wrapper usage, recording, and Group 0 behavior.
+  - This directory defines the shared task groups.
+  - Each group lives in its own file: `group-00.md` through `group-38.md`.
+  - When running a subset, read only the selected group files.
+  - When running the full suite, proceed in numeric order.
+  
+  ## Group Files
+  
+  - `group-00.md` — Setup & Diagnosis
+  - `group-01.md` — Reading & Extracting Real Content
+  - `group-02.md` — Search & Dynamic Interaction
+  - `group-03.md` — Complex Form
+  - `group-04.md` — SPA State Management
+  - `group-05.md` — Login Flow
+  - `group-06.md` — Multi-Step E-commerce
+  - `group-07.md` — Content + Interaction Combined
+  - `group-08.md` — Error Handling
+  - `group-09.md` — Export
+  - `group-10.md` — Nested Interactions & Modal Dialogs
+  - `group-11.md` — State Persistence & Page Reload
+  - `group-12.md` — Multi-Page Navigation & Back Button
+  - `group-13.md` — Form State & Multi-Step Submission
+  - `group-14.md` — Dynamic Content Loading
+  - `group-15.md` — Complex Data Extraction & Aggregation
+  - `group-16.md` — Hover & Tooltips
+  - `group-17.md` — Scrolling
+  - `group-18.md` — File Download
+  - `group-19.md` — iFrame
+  - `group-20.md` — Dialogs
+  - `group-21.md` — Async / awaitPromise
+  - `group-22.md` — Mouse Drag & Drop
+  - `group-23.md` — Async / Loading state
+  - `group-24.md` — Keyboard events
+  - `group-25.md` — Tab panels
+  - `group-26.md` — Accordion
+  - `group-27.md` — Contenteditable editor
+  - `group-28.md` — Range slider
+  - `group-29.md` — Pagination
+  - `group-30.md` — Custom dropdown menu
+  - `group-31.md` — Nested iframes (3 levels deep)
+  - `group-32.md` — Dynamic iframe (inserted after load)
+  - `group-33.md` — srcdoc iframe
+  - `group-34.md` — Sandboxed iframe
+  - `group-35.md` — Long-form article (Medium/Substack style)
+  - `group-36.md` — Search results page (SERP)
+  - `group-37.md` — Q&A thread (Stack-Overflow style)
+  - `group-38.md` — Pricing table
+  
+  # Group 0: Setup & Diagnosis
+  
+  ### 0.1 Server reachable
+  Check that the PinchTab server is healthy.
+  
+  **Verify**: Server responds with `status: ok`.
+  
+  ### 0.2 Auth is required
+  Make a request to the server with a **wrong** token (`PINCHTAB_TOKEN=wrong-token ./scripts/pt health`) and confirm it is rejected. The `pt` wrapper always injects the benchmark token by default, so you must explicitly override it to test auth rejection.
+  
+  **Verify**: Response is HTTP 401 or contains `unauthorized`.
+  
+  ### 0.3 Auth works with token
+  Repeat the same request WITH the bearer token and confirm it succeeds.
+  
+  **Verify**: Response is HTTP 200.
+  
+  ### 0.4 Instance available
+  Confirm at least one Chrome instance is running. If none exist, start one.
+  
+  **Verify**: Health response shows `defaultInstance.status == "running"` (or after starting one, the new instance is running).
+  
+  ### 0.5 List existing tabs
+  Get the current list of open tabs.
+  
+  **Verify**: A list (possibly empty) is returned without error.
+  
+  ### 0.6 Clean stale tabs
+  If any tabs from previous runs are open, close them so the benchmark starts from a known state.
+  
+  **Verify**: After cleanup, the tab list is empty (or only contains a single about:blank tab).
+  
+  ### 0.7 Network reach to target
+  Navigate to `http://fixtures/` and confirm the fixtures server is reachable from PinchTab.
+  
+  **Verify**: Navigate returns successfully and the page contains benchmark content.
+  
+  ### 0.8 Capture initial tab ID
+  Save the tab ID returned by the navigate in 0.7. Use this tab ID for all subsequent tasks to avoid creating new tabs.
+  
+  **Verify**: A tab ID was captured and matches what `GET /tabs` reports.
+  
+  ---
+  
+  # Group 1: Reading & Extracting Real Content
+  
+  ### 1.1 Get the full list of categories from the wiki index
+  Navigate to `http://fixtures/wiki.html` and extract all category names with their article counts.
+  
+  **Verify**: Can name at least 2 categories and their article counts (e.g. "Programming Languages: 12 articles").
+  
+  ### 1.2 Navigate by clicking a link
+  From the wiki index, click the "Go (programming language)" link to navigate to the Go article.
+  
+  **Verify**: You are now on the Go article page (not the wiki index).
+  
+  ### 1.3 Extract structured data from a table
+  On the Go article, read the infobox table and answer: Who designed Go, and what year did it first appear?
+  
+  **Verify**: Answer contains "Robert Griesemer" (or "Rob Pike" or "Ken Thompson") and "2009".
+  
+  ### 1.4 Count list items
+  On the Go article, count how many key features are listed.
+  
+  **Verify**: Answer is 6 (verify against `FEATURE_COUNT_6`).
+  
+  ### 1.5 Read all article headlines from articles page
+  Navigate to `http://fixtures/articles.html` and list all article titles.
+  
+  **Verify**: Found at least 3 articles including "The Future of Artificial Intelligence".
+  
+  ### 1.6 Read dashboard metrics
+  Navigate to `http://fixtures/dashboard.html` and extract: Total Users, Revenue, and Conversion Rate.
+  
+  **Verify**: Found `24,582` users AND `$1,284,930` revenue.
+  
+  ---
+- For each completed step:
+  1. record the observed answer with:
+  - ./scripts/record-step.sh --report-file /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/results/golden_report.json --type pinchtab <group> <step> answer "<what you saw>" "notes"
+  2. immediately verify it with:
+  - ./scripts/verify-step.sh --report-file /sessions/eager-determined-cannon/mnt/pinchtab/tests/benchmark/results/golden_report.json --type pinchtab <group> <step> <pass|fail|skip> "verification notes"
+- If a step cannot be completed, record fail or skip in the same report.
+- Do not leave answered steps pending verification.
+- Keep commands concise. Prefer rg/sed/cat only when you must inspect a specific file.
+- After the skill step, begin actual benchmark execution immediately.
+- Start with this bootstrap command sequence before attempting the selected steps:
+1. ./scripts/pt health
+2. ./scripts/pt tab
+3. export PINCHTAB_TAB=$(./scripts/pt nav http://fixtures/)
+4. ./scripts/pt snap -i -c
+- After the bootstrap, immediately execute Group 0 step 1.
+- Subset selection:
+  - Execute only these benchmark groups: 0, 1.
+  - Do not attempt groups outside this subset.
+  - Treat all other groups as out of scope for this run rather than as failures.
+  - For the selected groups, execute every step in the group unless blocked.
+- Finish when all selected steps are executed or when you are blocked.
+
+Your final answer should briefly summarize completion status and the main blockers, if any.

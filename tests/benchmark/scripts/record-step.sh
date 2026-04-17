@@ -3,10 +3,10 @@
 # Record a benchmark step result
 #
 # Usage:
-#   ./record-step.sh [--type baseline|agent|agent-browser] <group> <step> <pass|fail|skip|answer> [answer] [notes]
+#   ./record-step.sh [--type baseline|pinchtab|agent-browser] <group> <step> <pass|fail|skip|answer> [answer] [notes]
 #
 # Options:
-#   --type baseline|agent|agent-browser   Report type (default: auto-detect most recent)
+#   --type baseline|pinchtab|agent-browser   Report type (default: auto-detect most recent)
 #   --tokens <in> <out>     Deprecated compatibility field; benchmark reporting now prefers exact run-level usage
 #   --bytes <n>             HTTP response size in bytes (baseline runs)
 #   --tool-calls <n>        Override auto-counted tool calls
@@ -15,8 +15,8 @@
 #
 # Examples:
 #   ./record-step.sh 1 1 answer "Navigation completed" "Observed output"
-#   ./record-step.sh --type agent 2 3 fail "Element not found"
-#   ./record-step.sh --type agent 2 4 answer "Robert Griesemer, 2009" "read infobox"
+#   ./record-step.sh --type pinchtab 2 3 fail "Element not found"
+#   ./record-step.sh --type pinchtab 2 4 answer "Robert Griesemer, 2009" "read infobox"
 #   ./record-step.sh --type baseline 1 2 answer --bytes 4520 "Snapshot returned" "Observed output"
 
 set -euo pipefail
@@ -77,7 +77,7 @@ while [[ $# -gt 0 && "$1" == --* ]]; do
 done
 
 if [[ $# -lt 3 ]]; then
-    echo "Usage: $0 [--type baseline|agent|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip|answer> [answer] [notes]"
+    echo "Usage: $0 [--type baseline|pinchtab|agent-browser] [--report-file <path>] <group> <step> <pass|fail|skip|answer> [answer] [notes]"
     exit 1
 fi
 
@@ -127,7 +127,7 @@ if [[ -z "${REPORT_FILE}" ]]; then
                 REPORT_FILE="$(resolve_current_report "${CURRENT_BASELINE_PTR}" || true)"
                 [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/baseline_*.json 2>/dev/null | head -1)
                 ;;
-            agent)
+            pinchtab|agent)
                 REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_PTR}" || true)"
                 [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_benchmark_*.json 2>/dev/null | head -1)
                 ;;
@@ -136,7 +136,7 @@ if [[ -z "${REPORT_FILE}" ]]; then
                 [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json 2>/dev/null | head -1)
                 ;;
             *)
-                echo "ERROR: --type must be 'baseline', 'agent', or 'agent-browser'"
+                echo "ERROR: --type must be 'baseline', 'pinchtab', or 'agent-browser'"
                 exit 1
                 ;;
         esac
@@ -165,11 +165,11 @@ case "${BENCHMARK_TYPE}" in
                 ;;
         esac
         ;;
-    agent|agent-browser)
+    pinchtab|agent|agent-browser)
         case "${STATUS}" in
             answer|fail|skip) ;;
             *)
-                echo "ERROR: agent steps must use answer, fail, or skip"
+                echo "ERROR: pinchtab/agent steps must use answer, fail, or skip"
                 exit 1
                 ;;
         esac

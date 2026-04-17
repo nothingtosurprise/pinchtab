@@ -1,0 +1,23 @@
+Benchmark progress summary from the external report.
+- answered=35
+- execution_failed=0
+- execution_skipped=0
+- verified_passed=35
+- verified_failed=0
+- verified_skipped=0
+- pending_verification=0
+Recent recorded steps:
+- 5.2: status=answer / verify=pass; VERIFY_LOGIN_SUCCESS_DASHBOARD
+- 6.1: status=answer / verify=pass; Headphones .99, Watch .99, Charger .99. Mechanical Keyboard out of stock.
+- 6.2: status=answer / verify=pass; Total: .98
+- 6.3: status=answer / verify=pass; VERIFY_CHECKOUT_SUCCESS_ORDER
+- 7.1: status=answer / verify=pass; COMMENT_POSTED_RATING_5_TEXT_RECEIVED
+- 7.2: status=answer / verify=pass; Navigated wiki -> Python article after reading categories (DevTools 15, Languages 12)
+- 8.1: status=answer / verify=pass; 404 Not Found, server responsive
+- 8.2: status=answer / verify=pass; Error 400: no element found
+- 9.1: status=answer / verify=pass; screenshot-20260416-233758.jpg (61566 bytes)
+- 9.2: status=answer / verify=pass; page-20260416-233759.pdf (46078 bytes)
+- 10.1: status=answer / verify=pass; Settings modal visible with theme dropdown
+- 10.2: status=answer / verify=pass; THEME_DARK_APPLIED
+Use the report file and benchmark wrappers as the source of truth.
+Do not re-read large documentation files unless you are blocked on a specific syntax detail.

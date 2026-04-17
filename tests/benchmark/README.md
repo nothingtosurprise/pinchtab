@@ -17,24 +17,20 @@ cd tests/benchmark
 
 # agent-browser lane
 ./scripts/run-agent-browser-benchmark.sh
-# Then read AGENT_BROWSER_INSTRUCTIONS.md and run tasks from AGENT_BROWSER_TASKS.md with ./scripts/ab
+# Then read setup-agent-browser.md and benchmark-run/index.md and run tasks with ./scripts/ab
 ./scripts/finalize-report.sh
 
-# optional provider API runner
-OPENAI_API_KEY=... node --experimental-strip-types ./scripts/run-api-benchmark.ts --lane agent --finalize
-OPENAI_API_KEY=... node --experimental-strip-types ./scripts/run-api-benchmark.ts --lane agent-browser --finalize
-ANTHROPIC_API_KEY=... node --experimental-strip-types ./scripts/run-api-benchmark.ts --lane agent --model claude-haiku-4-5-20251001 --finalize
-ANTHROPIC_API_KEY=... node --experimental-strip-types ./scripts/run-api-benchmark.ts --lane agent-browser --model claude-haiku-4-5-20251001 --finalize
-
-# repo entrypoints
+# repo entrypoints (recommended)
 ./dev benchmark baseline
-OPENAI_API_KEY=... ./dev benchmark agent
-OPENAI_API_KEY=... ./dev benchmark agent-browser
-ANTHROPIC_API_KEY=... ./dev benchmark agent
-ANTHROPIC_API_KEY=... ./dev benchmark agent-browser
-ANTHROPIC_API_KEY=... ./dev benchmark agent --provider anthropic --turn-delay-ms 3000
-ANTHROPIC_API_KEY=... ./dev benchmark agent --provider anthropic --profile common10
-ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --provider anthropic --groups 0,1,2,3
+./dev benchmark pinchtab --dry-run
+OPENAI_API_KEY=... ./dev benchmark pinchtab
+ANTHROPIC_API_KEY=... ./dev benchmark pinchtab --profile common10
+ANTHROPIC_API_KEY=... ./dev benchmark pinchtab --max-input-tokens 50000
+ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --groups 0,1,2,3
+
+# direct Go runner
+ANTHROPIC_API_KEY=... go run ./cmd/api-runner --lane pinchtab --finalize
+ANTHROPIC_API_KEY=... go run ./cmd/api-runner --lane agent-browser --finalize
 ```
 
 ## MANDATORY: Docker Environment
@@ -54,9 +50,10 @@ If Docker build fails or is skipped, the benchmark is **INVALID**.
 | File | Purpose |
 |------|---------|
 | `../../skills/pinchtab/SKILL.md` | PinchTab skill (same as shipped product) |
-| `AGENT_BROWSER_INSTRUCTIONS.md` | Benchmark-local instructions for the `agent-browser` lane |
-| `BASELINE_TASKS.md` | Legacy descriptive baseline spec; not executed by the harness |
-| `AGENT_BROWSER_TASKS.md` | Equivalent task lane for `agent-browser` |
+| `setup-pinchtab.md` | PinchTab lane setup and wrapper guidance |
+| `setup-agent-browser.md` | agent-browser lane setup and wrapper guidance |
+| `benchmark-run/index.md` | Shared benchmark task index for the agent-driven lanes |
+| `benchmark-run/group-XX.md` | One markdown file per benchmark group |
 | `scripts/baseline.sh` | Executable baseline lane source of truth |
 | `scripts/run-optimization.sh` | Initialize PinchTab benchmark reports |
 | `scripts/run-agent-browser-benchmark.sh` | Start fixtures + `agent-browser` and initialize a fresh report |
@@ -139,22 +136,22 @@ The benchmark runs PinchTab in Docker with:
 Every step should record the observed answer/result:
 
 ```bash
-./scripts/record-step.sh --type agent <group> <step> <answer|fail|skip> "answer" "notes"
+./scripts/record-step.sh --type pinchtab <group> <step> <answer|fail|skip> "answer" "notes"
 ```
 
 Example:
 ```bash
-./scripts/record-step.sh --type agent 1 1 answer "Navigation completed in 1.2s" "observed output"
-./scripts/record-step.sh --type agent 2 3 fail "Element not found"
+./scripts/record-step.sh --type pinchtab 1 1 answer "Navigation completed in 1.2s" "observed output"
+./scripts/record-step.sh --type pinchtab 2 3 fail "Element not found"
 ```
 
 Deferred-verification example:
 
 ```bash
-./scripts/record-step.sh --type agent 1 1 answer \
+./scripts/record-step.sh --type pinchtab 1 1 answer \
   "Found categories Programming Languages: 12, Databases: 8" \
   "raw answer"
-./scripts/verify-step.sh --type agent 1 1 pass \
+./scripts/verify-step.sh --type pinchtab 1 1 pass \
   "Answer satisfies the benchmark oracle"
 ```
 

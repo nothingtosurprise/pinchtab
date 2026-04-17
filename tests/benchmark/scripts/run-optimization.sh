@@ -82,7 +82,7 @@ EOF
 cat > "${AGENT_REPORT}" << EOF
 {
   "benchmark": {
-    "type": "agent",
+    "type": "pinchtab",
     "run_number": ${RUN_NUMBER},
     "timestamp": "${TIMESTAMP}",
     "model": "${BENCHMARK_MODEL:-unknown}",

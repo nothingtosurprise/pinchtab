@@ -3,7 +3,7 @@
 # Records exact run-level usage for a benchmark report.
 #
 # Usage:
-#   ./record-run-usage.sh --type agent|agent-browser \
+#   ./record-run-usage.sh --type pinchtab|agent-browser \
 #     --provider anthropic \
 #     --input-tokens 123 \
 #     --output-tokens 45 \
@@ -90,7 +90,7 @@ fi
 
 if [[ -z "${REPORT_FILE}" ]]; then
   case "${REPORT_TYPE}" in
-    agent)
+    pinchtab|agent)
       REPORT_FILE="$(resolve_current_report "${CURRENT_AGENT_PTR}" || true)"
       [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_benchmark_*.json 2>/dev/null | head -1)
       ;;
@@ -99,7 +99,7 @@ if [[ -z "${REPORT_FILE}" ]]; then
       [[ -n "${REPORT_FILE}" ]] || REPORT_FILE=$(ls -t "${RESULTS_DIR}"/agent_browser_benchmark_*.json 2>/dev/null | head -1)
       ;;
     *)
-      echo "ERROR: --type must be 'agent' or 'agent-browser' unless --report-file is provided"
+      echo "ERROR: --type must be 'pinchtab' or 'agent-browser' unless --report-file is provided"
       exit 1
       ;;
   esac

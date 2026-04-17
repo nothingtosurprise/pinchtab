@@ -18,20 +18,19 @@ usage() {
   cat <<'EOF'
 Usage:
   ./dev benchmark baseline
-  OPENAI_API_KEY=... ./dev benchmark agent [extra runner args...]
-  OPENAI_API_KEY=... ./dev benchmark agent-browser [extra runner args...]
-  ANTHROPIC_API_KEY=... ./dev benchmark agent [extra runner args...]
-  ANTHROPIC_API_KEY=... ./dev benchmark agent-browser [extra runner args...]
+  OPENAI_API_KEY=... ./dev benchmark pinchtab [options...]
+  OPENAI_API_KEY=... ./dev benchmark agent-browser [options...]
+  ANTHROPIC_API_KEY=... ./dev benchmark pinchtab [options...]
+  ANTHROPIC_API_KEY=... ./dev benchmark agent-browser [options...]
 
 Examples:
   ./dev benchmark baseline
-  OPENAI_API_KEY=... ./dev benchmark agent --model gpt-5
-  OPENAI_API_KEY=... ./dev benchmark agent-browser --model gpt-5
-  ANTHROPIC_API_KEY=... ./dev benchmark agent --model claude-haiku-4-5-20251001
-  ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --model claude-haiku-4-5-20251001
-  ANTHROPIC_API_KEY=... ./dev benchmark agent --provider anthropic --turn-delay-ms 3000
-  ANTHROPIC_API_KEY=... ./dev benchmark agent --provider anthropic --profile common10
-  ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --provider anthropic --groups 0,1,2,3
+  ./dev benchmark pinchtab --dry-run
+  OPENAI_API_KEY=... ./dev benchmark pinchtab --model gpt-5
+  ANTHROPIC_API_KEY=... ./dev benchmark pinchtab --model claude-haiku-4-5-20251001
+  ANTHROPIC_API_KEY=... ./dev benchmark pinchtab --profile common10
+  ANTHROPIC_API_KEY=... ./dev benchmark pinchtab --max-input-tokens 50000
+  ANTHROPIC_API_KEY=... ./dev benchmark agent-browser --groups 0,1,2,3
 EOF
 }
 
@@ -52,12 +51,13 @@ case "${mode}" in
     BASELINE_REPORT="$(resolve_current_report "${RESULTS_DIR}/current_baseline_report.txt")"
     ./scripts/finalize-report.sh "${BASELINE_REPORT}"
     ;;
-  agent|agent-browser)
+  pinchtab|agent-browser)
     if [[ -z "${OPENAI_API_KEY:-}" && -z "${ANTHROPIC_API_KEY:-}" ]]; then
       echo "ERROR: OPENAI_API_KEY or ANTHROPIC_API_KEY is required for benchmark ${mode}" >&2
       exit 1
     fi
-    exec node --experimental-strip-types ./scripts/run-api-benchmark.ts --lane "${mode}" --finalize "$@"
+    cd "${ROOT_DIR}"
+    exec go run ./tests/benchmark/cmd/api-runner --lane "${mode}" --finalize "$@"
     ;;
   -h|--help|help)
     usage

@@ -4,10 +4,9 @@
 #
 # IMPORTANT:
 #   - This script is the executable source of truth for the baseline lane.
-#   - `tests/benchmark/BASELINE_TASKS.md` is descriptive/spec documentation only;
-#     `./dev benchmark baseline` does not parse that markdown file.
-#   - If baseline behavior changes, update this script first and then update
-#     any markdown/docs that describe the baseline contract.
+#   - `./dev benchmark baseline` runs this script directly.
+#   - If baseline behavior changes, update this script and then update any
+#     benchmark docs that describe the baseline contract.
 #
 # Prerequisites:
 #   - `bash scripts/run-optimization.sh` has been run first (initializes the

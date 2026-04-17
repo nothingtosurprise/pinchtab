@@ -617,16 +617,16 @@ docker compose up -d --build
 ./scripts/run-optimization.sh
 
 # 3. Run baseline (deterministic, ~30 seconds)
-./scripts/baseline_all.sh
+./scripts/baseline.sh
 
 # 4. Run PinchTab agent lane (requires LLM, ~15 minutes)
-# Execute tasks from AGENT_TASKS.md using ./scripts/pt
+# Execute tasks from benchmark-run/index.md + benchmark-run/group-XX.md using setup-pinchtab.md and ./scripts/pt
 
 # 5. Initialize agent-browser lane
 ./scripts/run-agent-browser-benchmark.sh
 
 # 6. Run agent-browser lane (requires LLM, ~20 minutes)
-# Execute tasks from AGENT_BROWSER_TASKS.md using ./scripts/ab
+# Execute tasks from benchmark-run/index.md + benchmark-run/group-XX.md using setup-agent-browser.md and ./scripts/ab
 
 # 7. Generate reports
 ./scripts/finalize-report.sh
