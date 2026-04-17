@@ -141,6 +141,33 @@ assert_output_contains "text" "returns text field"
 end_test
 
 # ─────────────────────────────────────────────────────────────────
+start_test "pinchtab text -s <selector>"
+
+pt_ok nav "${FIXTURES_URL}/index.html"
+pt_ok text -s "#welcome"
+assert_output_json
+assert_output_contains "Welcome" "extracts text from element"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pinchtab text <ref>"
+
+pt_ok nav "${FIXTURES_URL}/index.html"
+pt_ok snap -i -c
+# Extract a ref from the snapshot (first link)
+REF=$(echo "$PT_OUT" | safe_jq -r '.nodes[] | select(.role == "link") | .ref' | head -1)
+if [ -n "$REF" ] && [ "$REF" != "null" ]; then
+  pt_ok text "$REF"
+  assert_output_json
+  assert_output_contains "text" "returns text field for ref"
+else
+  echo -e "  ${YELLOW}⚠${NC} Could not extract ref from snapshot, skipping"
+fi
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
 # SKIP: text --raw outputs JSON instead of plain text
 # Bug: CLI sets mode=raw but not format=text
 # See: ~/dev/tmp/text-raw-bug.md

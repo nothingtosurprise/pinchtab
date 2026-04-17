@@ -37,15 +37,16 @@ Every PinchTab automation follows this pattern:
 
 1. Ensure the correct server, profile, or instance is available for the task.
 2. Navigate with `pinchtab nav <url>` or `pinchtab instance navigate <instance-id> <url>`.
-3. Observe with `pinchtab snap -i -c`, `pinchtab snap --text`, or `pinchtab text`, then collect the current refs such as `e5`.
+3. Observe with `pinchtab snap -i -c` (interactive refs, smaller), `pinchtab snap -c` (refs + body content), or `pinchtab text` (content only). Collect refs such as `e5`.
 4. Interact with those fresh refs using `click`, `fill`, `type`, `press`, `select`, `hover`, or `scroll`.
 5. Re-snapshot or re-read text after any navigation, submit, modal open, accordion expand, or other DOM-changing action.
 
 Rules:
 
 - Never act on stale refs after the page changes.
-- Default to `pinchtab text` when you need content, not layout.
-- Default to `pinchtab snap -i -c` when you need actionable elements.
+- Default to `pinchtab snap -i -c` for most observations — it returns only interactive elements and is smaller/faster.
+- Use `pinchtab snap -c` (no `-i`) only when you need **both** refs and body content in one call — e.g. verifying a success message after form submit.
+- Default to `pinchtab text` when you need content only and won't act on refs from the same observation.
 - Use screenshots only for visual verification, UI diffs, or debugging.
 - Start multi-site or parallel work by choosing the right instance or profile first.
 
@@ -157,6 +158,9 @@ pinchtab snap --text                                # Text output format
 pinchtab text                                       # Page text content (Readability-filtered; drops nav/repeated headlines)
 pinchtab text --full                                # Full page text (document.body.innerText) — use when Readability is dropping content you need
 pinchtab text --raw                                 # Alias of --full
+pinchtab text e5                                    # Extract text from element by ref
+pinchtab text -s "#article"                         # Extract text from element by CSS selector
+pinchtab text "xpath://div[@class='content']"       # Extract text from element by XPath
 # CLI returns JSON; use `| jq -r .text` for plain text
 pinchtab find <query>                               # Semantic element search
 pinchtab find --ref-only <query>                    # Return refs only
@@ -164,9 +168,18 @@ pinchtab find --ref-only <query>                    # Return refs only
 
 Guidance:
 
-- `snap -i -c` is the default for finding actionable refs.
+- **`snap -i -c`** is the default for most observations. It returns only interactive elements
+  (links, buttons, inputs, etc.) in compact form — smaller output, faster to parse.
+  Use this after navigation, DOM changes, or when you need fresh refs to act on.
+- **`snap -c` (no `-i`)** is for when you need refs **and** body content in one call.
+  The compact output includes headings, paragraphs, and landmarks alongside interactive refs.
+  Use this for verification steps ("did the success banner appear?") or initial page orientation
+  when you need to read content and act in the same observation.
 - `snap -d` is the default follow-up snapshot for multi-step flows.
-- `text` is the default for reading articles, dashboards, reports, or confirmation messages.
+- `text` is the default for reading articles, dashboards, reports, or confirmation messages
+  when you have no reason to act on refs from the same observation.
+- `text <selector>` extracts text from a specific element — use it to read a single card,
+  table cell, or status message without pulling the entire page.
 - **`pinchtab find <query>`** is the direct route when you already know the semantic target
   (e.g. "login button", "email input", "accept cookies link") — skips the full snapshot and
   returns a ranked match with its ref. Pair with `--ref-only` on large/dense pages to get just
@@ -291,7 +304,7 @@ Action examples:
 
 ## Common Patterns
 
-- **Form flow**: `nav` → `snap -i -c` → `fill` fields → `click --wait-nav` submit → `text` to verify
+- **Form flow**: `nav` → `snap -i -c` (refs for form fields) → `fill` fields → `click --wait-nav` submit → `snap -i -c` + `text` or `snap -c` (to verify success message). Use `snap -c` only when you need refs and body content in the same call.
 - **Multi-step**: After each action, `snap -d -i -c` for diff
 - **Direct selectors**: Skip snapshot when structure is known: `pinchtab click "text:Accept Cookies"` or `fill "#search" "query"`
 
@@ -299,7 +312,9 @@ Action examples:
 
 ## Token Economy
 
-Prefer low-token commands: `text`, `snap -i -c`, `snap -d`. Use `--block-images` for read-heavy tasks. Reserve screenshots/PDFs for visual verification.
+Prefer low-token commands: `snap -i -c` (default), `text`, `snap -d`. Use `--block-images` for read-heavy tasks. Reserve screenshots/PDFs for visual verification.
+
+**Always use `-i` with `snap`** unless you specifically need body content (headings, paragraphs) in the same call. Without `-i`, the full accessibility tree includes redundant StaticText nodes that inflate token usage.
 
 ## Diffing and Verification
 

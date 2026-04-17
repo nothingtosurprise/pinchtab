@@ -1,13 +1,15 @@
 package actions
 
 import (
-	"github.com/pinchtab/pinchtab/internal/cli/apiclient"
-	"github.com/spf13/cobra"
 	"net/http"
 	"net/url"
+
+	"github.com/pinchtab/pinchtab/internal/cli/apiclient"
+	"github.com/pinchtab/pinchtab/internal/selector"
+	"github.com/spf13/cobra"
 )
 
-func Text(client *http.Client, base, token string, cmd *cobra.Command) {
+func Text(client *http.Client, base, token string, cmd *cobra.Command, args []string) {
 	params := url.Values{}
 	// --full is the preferred, discoverable name; --raw is kept as a
 	// backward-compatible alias. Both switch the server off its default
@@ -29,5 +31,22 @@ func Text(client *http.Client, base, token string, cmd *cobra.Command) {
 	if v, _ := cmd.Flags().GetString("frame"); v != "" {
 		params.Set("frameId", v)
 	}
+
+	// Handle element selector - positional arg takes precedence over --selector flag
+	selectorStr := ""
+	if len(args) > 0 {
+		selectorStr = args[0]
+	} else if v, _ := cmd.Flags().GetString("selector"); v != "" {
+		selectorStr = v
+	}
+	if selectorStr != "" {
+		sel := selector.Parse(selectorStr)
+		if sel.Kind == selector.KindRef {
+			params.Set("ref", sel.Value)
+		} else {
+			params.Set("selector", selectorStr)
+		}
+	}
+
 	apiclient.DoGet(client, base, token, "/text", params)
 }

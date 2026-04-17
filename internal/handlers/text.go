@@ -83,6 +83,29 @@ func (h *Handlers) HandleText(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Handle element selector - extract text from specific element instead of full page
+	selectorParam := r.URL.Query().Get("selector")
+	refParam := r.URL.Query().Get("ref")
+	if selectorParam != "" || refParam != "" {
+		text, err := h.extractElementText(tCtx, resolvedTabID, selectorParam, refParam)
+		if err != nil {
+			httpx.Error(w, 500, fmt.Errorf("element text extract: %w", err))
+			return
+		}
+		var url, title string
+		_ = chromedp.Run(tCtx,
+			chromedp.Location(&url),
+			chromedp.Title(&title),
+		)
+		h.recordResolvedURL(r, url)
+		httpx.JSON(w, 200, map[string]any{
+			"url":   url,
+			"title": title,
+			"text":  text,
+		})
+		return
+	}
+
 	script := `document.body.innerText`
 	if mode != "raw" {
 		script = assets.ReadabilityJS
@@ -205,4 +228,80 @@ func (h *Handlers) HandleTabText(w http.ResponseWriter, r *http.Request) {
 	req.URL = &u
 
 	h.HandleText(w, req)
+}
+
+// extractElementText extracts innerText from a specific element by selector or ref.
+func (h *Handlers) extractElementText(ctx context.Context, tabID, selector, ref string) (string, error) {
+	var text string
+
+	if ref != "" {
+		cache := h.Bridge.GetRefCache(tabID)
+		if cache == nil {
+			return "", fmt.Errorf("ref not found: %s (no snapshot cache)", ref)
+		}
+		target, ok := cache.Lookup(ref)
+		if !ok {
+			return "", fmt.Errorf("ref not found: %s", ref)
+		}
+		nodeID := target.BackendNodeID
+
+		err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+			var objRes struct {
+				Object struct {
+					ObjectID string `json:"objectId"`
+				} `json:"object"`
+			}
+			if err := chromedp.FromContext(ctx).Target.Execute(ctx, "DOM.resolveNode", map[string]any{
+				"backendNodeId": nodeID,
+			}, &objRes); err != nil {
+				return err
+			}
+			if objRes.Object.ObjectID == "" {
+				return fmt.Errorf("could not resolve node")
+			}
+			var callRes struct {
+				Result struct {
+					Value string `json:"value"`
+				} `json:"result"`
+			}
+			if err := chromedp.FromContext(ctx).Target.Execute(ctx, "Runtime.callFunctionOn", map[string]any{
+				"functionDeclaration": `function() { return this.innerText || this.textContent || ''; }`,
+				"objectId":            objRes.Object.ObjectID,
+				"returnByValue":       true,
+			}, &callRes); err != nil {
+				return err
+			}
+			text = callRes.Result.Value
+			return nil
+		}))
+		if err != nil {
+			return "", err
+		}
+		return text, nil
+	}
+
+	var script string
+	switch {
+	case strings.HasPrefix(selector, "xpath:"):
+		xpath := selector[len("xpath:"):]
+		script = fmt.Sprintf(`(function(){var r=document.evaluate(%q,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null);var n=r.singleNodeValue;return n?(n.innerText||n.textContent||''):null})()`, xpath)
+	case strings.HasPrefix(selector, "//") || strings.HasPrefix(selector, "(//"):
+		script = fmt.Sprintf(`(function(){var r=document.evaluate(%q,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null);var n=r.singleNodeValue;return n?(n.innerText||n.textContent||''):null})()`, selector)
+	case strings.HasPrefix(selector, "text:"):
+		textVal := selector[len("text:"):]
+		script = fmt.Sprintf(`(function(){var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(w.nextNode()){if(w.currentNode.textContent.includes(%q))return w.currentNode.parentElement.innerText||w.currentNode.parentElement.textContent||''}return null})()`, textVal)
+	case strings.HasPrefix(selector, "css:"):
+		css := selector[len("css:"):]
+		script = fmt.Sprintf(`(function(){var n=document.querySelector(%q);return n?(n.innerText||n.textContent||''):null})()`, css)
+	default:
+		script = fmt.Sprintf(`(function(){var n=document.querySelector(%q);return n?(n.innerText||n.textContent||''):null})()`, selector)
+	}
+
+	if err := chromedp.Run(ctx, chromedp.Evaluate(script, &text)); err != nil {
+		return "", err
+	}
+	if text == "" {
+		return "", fmt.Errorf("no element matches selector: %s", selector)
+	}
+	return text, nil
 }

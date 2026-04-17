@@ -59,11 +59,12 @@ var pdfCmd = &cobra.Command{
 }
 
 var textCmd = &cobra.Command{
-	Use:   "text",
+	Use:   "text [selector]",
 	Short: "Extract page text",
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		runCLI(func(rt cliRuntime) {
-			browseractions.Text(rt.client, rt.base, rt.token, cmd)
+			browseractions.Text(rt.client, rt.base, rt.token, cmd, args)
 		})
 	},
 }
