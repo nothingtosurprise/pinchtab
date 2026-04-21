@@ -148,8 +148,10 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 		Nodes []bridge.RawAXNode `json:"nodes"`
 	}{Nodes: nodes}
 
+	var scopeNodeID int64
 	if selector != "" {
-		scopeNodeID, scopeErr := h.resolveSelectorNodeID(tCtx, resolvedTabID, selector)
+		var scopeErr error
+		scopeNodeID, scopeErr = h.resolveSelectorNodeID(tCtx, resolvedTabID, selector)
 		if scopeErr != nil {
 			httpx.Error(w, 400, frameScopedSelectorError("selector", scopeErr))
 			return
@@ -159,6 +161,55 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flat, refs := bridge.BuildSnapshot(treeResp.Nodes, filter, maxDepth)
+
+	// Check if scoped snapshot returned 0 nodes but element exists in DOM
+	var scopedEmptyHint string
+	if len(flat) == 0 && selector != "" && scopeNodeID != 0 {
+		// Element was found (no scopeErr) but has no accessible children
+		// Use the resolved nodeID to get element info via CDP
+		var elemInfo string
+		err := chromedp.Run(tCtx, chromedp.ActionFunc(func(ctx context.Context) error {
+			var result map[string]any
+			if execErr := chromedp.FromContext(ctx).Target.Execute(ctx, "DOM.describeNode", map[string]any{
+				"backendNodeId": scopeNodeID,
+			}, &result); execErr != nil {
+				return execErr
+			}
+			if node, ok := result["node"].(map[string]any); ok {
+				tag := node["localName"]
+				nodeType := node["nodeName"]
+				childCount := 0
+				if cc, ok := node["childNodeCount"].(float64); ok {
+					childCount = int(cc)
+				}
+				attrs := ""
+				if attrList, ok := node["attributes"].([]any); ok {
+					for i := 0; i+1 < len(attrList); i += 2 {
+						switch attrList[i] {
+						case "id":
+							attrs += "#" + attrList[i+1].(string)
+						case "class":
+							classes := strings.Fields(attrList[i+1].(string))
+							if len(classes) > 0 {
+								attrs += "." + strings.Join(classes[:min(2, len(classes))], ".")
+							}
+						}
+					}
+				}
+				if tag != nil {
+					elemInfo = fmt.Sprintf("<%s%s> with %d child nodes", tag, attrs, childCount)
+				} else if nodeType != nil {
+					elemInfo = fmt.Sprintf("<%s%s> with %d child nodes", nodeType, attrs, childCount)
+				}
+			}
+			return nil
+		}))
+		if err == nil && elemInfo != "" {
+			scopedEmptyHint = fmt.Sprintf("Element exists in DOM (%s) but has no accessible nodes. Use `text --selector %s` or `eval` to extract content.", elemInfo, selector)
+		} else if err == nil {
+			scopedEmptyHint = fmt.Sprintf("Element exists in DOM but has no accessible nodes. Use `text --selector %s` or `eval` to extract content.", selector)
+		}
+	}
 
 	truncated := false
 	if maxTokens > 0 {
@@ -370,6 +421,9 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprintf(w, " (truncated to ~%d tokens)", maxTokens)
 		}
 		_, _ = w.Write([]byte("\n"))
+		if scopedEmptyHint != "" {
+			_, _ = fmt.Fprintf(w, "# hint: %s\n", scopedEmptyHint)
+		}
 		content := bridge.FormatSnapshotCompact(flat)
 		if wrapContent {
 			content = h.IDPIGuard.WrapContent(content, url)
@@ -378,7 +432,11 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 	case "text":
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
-		_, _ = fmt.Fprintf(w, "# %s\n# %s\n# %d nodes\n\n", title, url, len(flat))
+		_, _ = fmt.Fprintf(w, "# %s\n# %s\n# %d nodes\n", title, url, len(flat))
+		if scopedEmptyHint != "" {
+			_, _ = fmt.Fprintf(w, "# hint: %s\n", scopedEmptyHint)
+		}
+		_, _ = w.Write([]byte("\n"))
 		content := bridge.FormatSnapshotText(flat)
 		if wrapContent {
 			content = h.IDPIGuard.WrapContent(content, url)
@@ -390,6 +448,9 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 			"title": title,
 			"nodes": flat,
 			"count": len(flat),
+		}
+		if scopedEmptyHint != "" {
+			data["hint"] = scopedEmptyHint
 		}
 		yamlContent, err := yaml.Marshal(data)
 		if err != nil {
@@ -410,6 +471,9 @@ func (h *Handlers) HandleSnapshot(w http.ResponseWriter, r *http.Request) {
 		if truncated {
 			resp["truncated"] = true
 			resp["maxTokens"] = maxTokens
+		}
+		if scopedEmptyHint != "" {
+			resp["hint"] = scopedEmptyHint
 		}
 		if idpiResult.Threat {
 			resp["idpiWarning"] = idpiResult.Reason
