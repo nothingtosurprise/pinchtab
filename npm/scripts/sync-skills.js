@@ -45,6 +45,8 @@ function getTargetSkillDirs() {
     path.join(home, '.cursor', 'skills', SKILL_NAME),
     // Windsurf
     path.join(home, '.windsurf', 'skills', SKILL_NAME),
+    // Codex
+    path.join(home, '.codex', 'skills', SKILL_NAME),
   ];
 
   return candidates.filter((dir) => {
