@@ -90,12 +90,16 @@ func (h *Handlers) HandleTabHandoff(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	httpx.JSON(w, 200, map[string]any{
+	resp := map[string]any{
 		"tabId":     resolvedTabID,
 		"status":    "paused_handoff",
 		"reason":    reason,
 		"timeoutMs": req.TimeoutMs,
-	})
+	}
+	if timeout > 0 {
+		resp["expiresAt"] = time.Now().UTC().Add(timeout).Format(time.RFC3339)
+	}
+	httpx.JSON(w, 200, resp)
 }
 
 func (h *Handlers) HandleTabResume(w http.ResponseWriter, r *http.Request) {
