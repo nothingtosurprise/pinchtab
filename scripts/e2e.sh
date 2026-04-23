@@ -645,7 +645,8 @@ run_plugin() {
   run_logged_command "${output_file}" "" "building support images" build_support_images "${compose_file}"
   local plugin_exit=$?
   local -a args=()
-  [ -n "${E2E_FILTER}" ] && args+=("filter=${E2E_FILTER}")
+  # Plugin suite ignores E2E_FILTER since it only has plugin-basic.sh
+  # and filters like "api-extended" don't make sense for it
   if [ "${plugin_exit}" -eq 0 ]; then
     run_logged_command "${output_file}" "${progress_file}" "running plugin suite" compose -f "${compose_file}" run --build --rm runner-api /bin/bash /e2e/run.sh plugin "${args[@]}"
     plugin_exit=$?

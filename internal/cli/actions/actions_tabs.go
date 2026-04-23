@@ -100,3 +100,59 @@ func TabFocus(client *http.Client, base, token string, tabID string, cmd *cobra.
 	})
 	output.Value(tabID)
 }
+
+// TabHandoff pauses automation on a tab for manual operator intervention.
+func TabHandoff(client *http.Client, base, token, tabID, reason string, timeoutMS int, cmd *cobra.Command) {
+	body := map[string]any{}
+	if reason != "" {
+		body["reason"] = reason
+	}
+	if timeoutMS > 0 {
+		body["timeoutMs"] = timeoutMS
+	}
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	if jsonOutput {
+		apiclient.DoPost(client, base, token, fmt.Sprintf("/tabs/%s/handoff", tabID), body)
+		return
+	}
+	apiclient.DoPostQuiet(client, base, token, fmt.Sprintf("/tabs/%s/handoff", tabID), body)
+	output.Value("paused")
+	if reason != "" {
+		output.Hint(fmt.Sprintf("reason: %s", reason))
+	}
+}
+
+// TabResume resumes automation on a tab after manual intervention.
+func TabResume(client *http.Client, base, token, tabID, status string, cmd *cobra.Command) {
+	body := map[string]any{}
+	if status != "" {
+		body["status"] = status
+	}
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	if jsonOutput {
+		apiclient.DoPost(client, base, token, fmt.Sprintf("/tabs/%s/resume", tabID), body)
+		return
+	}
+	apiclient.DoPostQuiet(client, base, token, fmt.Sprintf("/tabs/%s/resume", tabID), body)
+	output.Value("resumed")
+}
+
+// TabHandoffStatus shows whether a tab is in paused_handoff or active state.
+func TabHandoffStatus(client *http.Client, base, token, tabID string, cmd *cobra.Command) {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	if jsonOutput {
+		apiclient.DoGet(client, base, token, fmt.Sprintf("/tabs/%s/handoff", tabID), nil)
+		return
+	}
+	body := apiclient.DoGetRaw(client, base, token, fmt.Sprintf("/tabs/%s/handoff", tabID), nil)
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		fmt.Println(string(body))
+		return
+	}
+	status, _ := result["status"].(string)
+	output.Value(status)
+	if reason, ok := result["reason"].(string); ok && reason != "" {
+		output.Hint(fmt.Sprintf("reason: %s", reason))
+	}
+}

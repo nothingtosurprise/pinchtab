@@ -16,7 +16,7 @@ import (
 )
 
 type tabHandoffController interface {
-	SetTabHandoff(tabID, reason string) error
+	SetTabHandoff(tabID, reason string, timeout time.Duration) error
 	ResumeTabHandoff(tabID string) error
 	TabHandoffState(tabID string) (bridge.TabHandoffState, bool)
 }
@@ -66,7 +66,12 @@ func (h *Handlers) HandleTabHandoff(w http.ResponseWriter, r *http.Request) {
 	if reason == "" {
 		reason = "manual_handoff"
 	}
-	if err := ctrl.SetTabHandoff(resolvedTabID, reason); err != nil {
+	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
+	if req.TimeoutMs < 0 {
+		httpx.Error(w, 400, fmt.Errorf("timeoutMs must be >= 0"))
+		return
+	}
+	if err := ctrl.SetTabHandoff(resolvedTabID, reason, timeout); err != nil {
 		httpx.ErrorCode(w, 500, "handoff_failed", err.Error(), false, nil)
 		return
 	}
@@ -85,12 +90,16 @@ func (h *Handlers) HandleTabHandoff(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	httpx.JSON(w, 200, map[string]any{
+	resp := map[string]any{
 		"tabId":     resolvedTabID,
 		"status":    "paused_handoff",
 		"reason":    reason,
 		"timeoutMs": req.TimeoutMs,
-	})
+	}
+	if timeout > 0 {
+		resp["expiresAt"] = time.Now().UTC().Add(timeout).Format(time.RFC3339)
+	}
+	httpx.JSON(w, 200, resp)
 }
 
 func (h *Handlers) HandleTabResume(w http.ResponseWriter, r *http.Request) {
@@ -173,13 +182,18 @@ func (h *Handlers) HandleTabHandoffStatus(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if state, ok := ctrl.TabHandoffState(resolvedTabID); ok {
-		httpx.JSON(w, 200, map[string]any{
+		resp := map[string]any{
 			"tabId":         resolvedTabID,
 			"status":        state.Status,
 			"reason":        state.Reason,
 			"pausedAt":      state.PausedAt.Format(time.RFC3339),
 			"lastUpdatedAt": state.LastUpdatedAt.Format(time.RFC3339),
-		})
+		}
+		if !state.ExpiresAt.IsZero() {
+			resp["expiresAt"] = state.ExpiresAt.Format(time.RFC3339)
+			resp["timeoutMs"] = int(state.ExpiresAt.Sub(state.PausedAt).Milliseconds())
+		}
+		httpx.JSON(w, 200, resp)
 		return
 	}
 

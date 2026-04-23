@@ -303,3 +303,116 @@ pt_post "/tabs/${TAB_ID}/unlock" -d "{\"owner\":\"path-agent\"}"
 assert_ok "path-based unlock"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+# Human Handoff Tests
+# ─────────────────────────────────────────────────────────────────
+
+start_test "handoff: pause and resume flow"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+HANDOFF_TAB=$(get_tab_id)
+show_tab "created" "$HANDOFF_TAB"
+
+pt_post "/tabs/${HANDOFF_TAB}/handoff" -d '{"reason":"captcha_test"}'
+assert_ok "handoff tab"
+assert_json_eq "$RESULT" '.status' 'paused_handoff' "status is paused_handoff"
+assert_json_eq "$RESULT" '.reason' 'captcha_test' "reason matches"
+
+pt_get "/tabs/${HANDOFF_TAB}/handoff"
+assert_ok "get handoff status"
+assert_json_eq "$RESULT" '.status' 'paused_handoff' "still paused"
+
+pt_post "/tabs/${HANDOFF_TAB}/resume" -d '{"status":"completed"}'
+assert_ok "resume tab"
+
+pt_get "/tabs/${HANDOFF_TAB}/handoff"
+assert_ok "get handoff status after resume"
+assert_json_eq "$RESULT" '.status' 'active' "status is active after resume"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "handoff: actions blocked while paused"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+BLOCK_TAB=$(get_tab_id)
+show_tab "created" "$BLOCK_TAB"
+
+pt_post "/tabs/${BLOCK_TAB}/handoff" -d '{"reason":"manual_intervention"}'
+assert_ok "pause tab for handoff"
+
+pt_post /action -d "{\"kind\":\"click\",\"selector\":\"#increment\",\"tabId\":\"${BLOCK_TAB}\"}"
+assert_http_status 409 "action blocked during handoff"
+assert_contains "$RESULT" "tab_paused_handoff" "error code is tab_paused_handoff"
+
+pt_post "/tabs/${BLOCK_TAB}/resume" -d '{}'
+assert_ok "resume tab"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "handoff: actions work after resume"
+
+pt_post "/tabs/${BLOCK_TAB}/navigate" -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+assert_ok "navigate to buttons page"
+
+pt_post /wait -d "{\"tabId\":\"${BLOCK_TAB}\",\"selector\":\"#increment\"}"
+assert_ok "wait for button"
+
+pt_post /action -d "{\"kind\":\"click\",\"selector\":\"#increment\",\"tabId\":\"${BLOCK_TAB}\"}"
+assert_ok "action succeeds after resume"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "handoff: batch actions blocked while paused"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+BATCH_TAB=$(get_tab_id)
+show_tab "created" "$BATCH_TAB"
+
+pt_post "/tabs/${BATCH_TAB}/handoff" -d '{"reason":"captcha"}'
+assert_ok "pause tab"
+
+pt_post /actions -d "{\"tabId\":\"${BATCH_TAB}\",\"actions\":[{\"kind\":\"click\",\"selector\":\"#increment\"}]}"
+assert_ok "batch returns 200 with error in results"
+assert_json_contains "$RESULT" '.results[0].error' 'paused for human handoff' "error mentions handoff"
+assert_json_eq "$RESULT" '.failed' '1' "one action failed"
+
+pt_post "/tabs/${BATCH_TAB}/resume" -d '{}'
+assert_ok "resume tab"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "handoff: timeout auto-expires"
+
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+TIMEOUT_TAB=$(get_tab_id)
+show_tab "created" "$TIMEOUT_TAB"
+
+pt_post "/tabs/${TIMEOUT_TAB}/handoff" -d '{"reason":"short_timeout","timeoutMs":1500}'
+assert_ok "handoff with timeout"
+assert_json_exists "$RESULT" '.expiresAt' "response includes expiresAt"
+
+pt_get "/tabs/${TIMEOUT_TAB}/handoff"
+assert_ok "check status before timeout"
+assert_json_eq "$RESULT" '.status' 'paused_handoff' "still paused before timeout"
+
+sleep 2
+
+pt_get "/tabs/${TIMEOUT_TAB}/handoff"
+assert_ok "check status after timeout"
+assert_json_eq "$RESULT" '.status' 'active' "auto-expired to active"
+
+pt_post "/tabs/${TIMEOUT_TAB}/navigate" -d "{\"url\":\"${FIXTURES_URL}/buttons.html\"}"
+assert_ok "navigate to buttons page"
+
+pt_post /wait -d "{\"tabId\":\"${TIMEOUT_TAB}\",\"selector\":\"#increment\"}"
+assert_ok "wait for button"
+
+pt_post /action -d "{\"kind\":\"click\",\"selector\":\"#increment\",\"tabId\":\"${TIMEOUT_TAB}\"}"
+assert_ok "action succeeds after timeout expiry"
+
+end_test
