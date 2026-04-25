@@ -164,6 +164,35 @@ pt find "xyznonexistent99999"
 end_test
 
 # ─────────────────────────────────────────────────────────────────
+start_test "pinchtab find (negative query)"
+
+pt_ok nav "${FIXTURES_URL}/find.html"
+# Resolve "log in" first; the negative form "log in not sign in" must keep
+# matching it, while "log in not log in" must not return the same ref.
+pt_ok find "log in" --ref-only
+LOGIN_REF="$PT_OUT"
+pt_ok find "log in button not sign up" --ref-only
+assert_output_contains "$LOGIN_REF" "negative query keeps Log In when excluding Sign Up"
+
+pt_ok find "button not log in" --ref-only
+assert_output_not_contains "$LOGIN_REF" "negative query 'button not log in' excludes Log In ref"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+start_test "pinchtab find (visual query: top vs bottom button)"
+
+pt_ok nav "${FIXTURES_URL}/find.html"
+# "top button" and "bottom button" share the same base query but bias toward
+# opposite ends of document order. The two refs must differ.
+pt_ok find "top button" --ref-only
+TOP_REF="$PT_OUT"
+pt_ok find "bottom button" --ref-only
+assert_output_not_contains "$TOP_REF" "visual hint produces different refs for top vs bottom"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
 start_test "pinchtab snap --text"
 
 pt_ok nav "${FIXTURES_URL}/index.html"

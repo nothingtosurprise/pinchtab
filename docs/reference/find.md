@@ -71,6 +71,46 @@ If `tabId` is omitted, PinchTab uses the active tab in the current bridge contex
 
 When `explain` is enabled, each match may also include lexical and embedding score details.
 
+## Query Syntax
+
+Beyond plain natural-language descriptions, the matcher understands two query modifiers:
+
+### Negative Queries
+
+Use `not`, `without`, `exclude`, `excluding`, `except`, `no`, or `ignore` to push elements away from the match:
+
+```bash
+# Picks Cancel over Submit
+pinchtab find "button not submit"
+
+# Compose multiple exclusions
+pinchtab find "input no password no username"
+
+# Exclude a phrase
+pinchtab find "button without sign in"
+```
+
+Tokens before the trigger are positive; everything after is negative until the next trigger or end of query.
+
+### Visual / Location Queries
+
+Directional and relative phrases bias the match toward elements at the matching position on the page:
+
+```bash
+# Directional (top / bottom / left / right / corner)
+pinchtab find "bottom button"
+pinchtab find "button in top right corner"
+pinchtab find "sidebar on the left"
+
+# Anchor-relative (above / below / under / over)
+pinchtab find "link below the search box"
+pinchtab find "button above the footer"
+```
+
+When the accessibility snapshot has no coordinates, document order is used as a fallback for vertical position — so `"bottom button"` selects the last matching button in the snapshot. When element bounding boxes are available they take precedence.
+
+Visual hints are applied by the combined matcher (the default). They do not affect the lexical-only matcher.
+
 ## Confidence Levels
 
 | Level | Score Range | Meaning |
