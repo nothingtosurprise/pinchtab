@@ -284,6 +284,69 @@ func TestHandleFind_ResponseMetrics(t *testing.T) {
 	}
 }
 
+func TestHandleFind_NegativeQuery(t *testing.T) {
+	cache := &bridge.RefCache{
+		Nodes: []bridge.A11yNode{
+			{Ref: "e0", Role: "button", Name: "Submit"},
+			{Ref: "e1", Role: "button", Name: "Cancel"},
+		},
+		Refs: map[string]int64{"e0": 1, "e1": 2},
+	}
+
+	h := newFindTestHandler(cache, false)
+
+	body := `{"query": "button not submit", "threshold": 0.0, "topK": 3}`
+	req := httptest.NewRequest("POST", "/find", bytes.NewReader([]byte(body)))
+	w := httptest.NewRecorder()
+	h.HandleFind(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp findResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.BestRef != "e1" {
+		t.Errorf("expected best_ref=e1 (Cancel) for negative query, got %s", resp.BestRef)
+	}
+}
+
+func TestHandleFind_VisualQuery_BottomButton(t *testing.T) {
+	cache := &bridge.RefCache{
+		Nodes: []bridge.A11yNode{
+			{Ref: "e0", Role: "button", Name: "Action"},
+			{Ref: "e1", Role: "button", Name: "Action"},
+			{Ref: "e2", Role: "button", Name: "Action"},
+		},
+		Refs: map[string]int64{"e0": 1, "e1": 2, "e2": 3},
+	}
+
+	mb := &findMockBridge{refCache: cache}
+	h := New(mb, &config.RuntimeConfig{ActionTimeout: 10 * time.Second}, nil, nil, nil)
+	h.Matcher = semantic.NewCombinedMatcher(semantic.NewHashingEmbedder(128))
+
+	body := `{"query": "bottom button", "threshold": 0.0, "topK": 3}`
+	req := httptest.NewRequest("POST", "/find", bytes.NewReader([]byte(body)))
+	w := httptest.NewRecorder()
+	h.HandleFind(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp findResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.BestRef != "e2" {
+		t.Errorf("expected best_ref=e2 (last in document order) for 'bottom button', got %s", resp.BestRef)
+	}
+}
+
 func TestHandleFind_EmbeddingMatcher(t *testing.T) {
 	cache := &bridge.RefCache{
 		Nodes: []bridge.A11yNode{

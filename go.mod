@@ -9,11 +9,10 @@ require (
 	github.com/gost-dom/browser v0.11.0
 	github.com/mark3labs/mcp-go v0.45.0
 	github.com/pinchtab/idpishield v0.1.4
-	github.com/pinchtab/semantic v0.1.1
+	github.com/pinchtab/semantic v0.1.2
 	github.com/shirou/gopsutil/v4 v4.26.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.47.0
-	golang.org/x/text v0.35.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -41,4 +40,5 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 )
