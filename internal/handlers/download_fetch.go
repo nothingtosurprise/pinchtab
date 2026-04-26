@@ -30,7 +30,19 @@ func (h *Handlers) fetchDirectWithCookies(ctx context.Context, browserCtx contex
 		slog.Debug("download fallback: failed to get browser cookies", "err", fetchErr)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", dlURL, nil)
+	// Inline re-validation: the caller already validated dlURL via the same
+	// validator, and the guarded client re-checks IPs at dial time and on
+	// redirects. Repeating it here is defence-in-depth and lets CodeQL see
+	// the validation in the same function as the request sink.
+	if err := validator.Validate(dlURL); err != nil {
+		return nil, "", 0, err
+	}
+	parsed, err := url.Parse(dlURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, "", 0, fmt.Errorf("invalid download URL")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
 	if err != nil {
 		return nil, "", 0, err
 	}
