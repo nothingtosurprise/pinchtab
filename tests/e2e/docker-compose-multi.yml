@@ -196,6 +196,7 @@ services:
       - E2E_BRIDGE_TOKEN=e2e-bridge-token
       - FIXTURES_URL=http://fixtures:80
       - E2E_SCENARIO_FILTER
+      - E2E_TEST_FILTER
       - E2E_SUITE
       - E2E_EXTENDED
       - STEALTH_MATRIX

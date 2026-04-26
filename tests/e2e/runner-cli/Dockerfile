@@ -19,7 +19,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/pinchtab ./cmd/pinchtab
 
 # ── Runner image ──────────────────────────────────────────────────────────────
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN apk add --no-cache \
     bash \

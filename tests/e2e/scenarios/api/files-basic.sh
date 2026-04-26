@@ -26,6 +26,9 @@ end_test
 # ─────────────────────────────────────────────────────────────────
 start_test "pinchtab screenshot --tab <id>"
 
+pt_post /navigate -d "{\"url\":\"${FIXTURES_URL}/table.html\"}"
+sleep 1
+
 pt_get /tabs
 TAB_ID=$(get_first_tab)
 

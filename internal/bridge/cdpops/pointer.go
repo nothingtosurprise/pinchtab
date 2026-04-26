@@ -75,24 +75,24 @@ func MouseWheelByCoordinate(ctx context.Context, x, y float64, deltaX, deltaY in
 		return err
 	}
 
-	return chromedp.Run(ctx,
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			return chromedp.FromContext(ctx).Target.Execute(ctx, "Input.dispatchMouseEvent", map[string]any{
-				"type": "mouseMoved",
-				"x":    x,
-				"y":    y,
-			}, nil)
-		}),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			return chromedp.FromContext(ctx).Target.Execute(ctx, "Input.dispatchMouseEvent", map[string]any{
-				"type":   "mouseWheel",
-				"x":      x,
-				"y":      y,
-				"deltaX": deltaX,
-				"deltaY": deltaY,
-			}, nil)
-		}),
-	)
+	// Synthetic Input.dispatchMouseEvent(mouseWheel) in --headless=new no
+	// longer reliably fires `wheel` JS listeners and can stall on the
+	// compositor ack chain. Dispatch a real WheelEvent at the point under
+	// the cursor so listeners run, then scroll the window if no listener
+	// called preventDefault().
+	expr := fmt.Sprintf(`(function() {
+		var dx = %d, dy = %d, cx = %f, cy = %f;
+		var target = document.elementFromPoint(cx, cy) || document.documentElement;
+		var ev = new WheelEvent('wheel', {
+			deltaX: dx, deltaY: dy,
+			clientX: cx, clientY: cy,
+			bubbles: true, cancelable: true
+		});
+		if (target.dispatchEvent(ev)) {
+			window.scrollBy(dx, dy);
+		}
+	})()`, deltaX, deltaY, x, y)
+	return chromedp.Run(ctx, chromedp.Evaluate(expr, nil))
 }
 
 func ClickByCoordinate(ctx context.Context, x, y float64) error {

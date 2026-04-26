@@ -36,6 +36,7 @@ COMMANDS=(
   "  api-extended:🐳:API extended (multi-instance)"
   "  cli-extended:🐳:CLI extended tests"
   "  infra-extended:🐳:Infra extended (multi-instance)"
+  "  test <name>:🐳:Run a single E2E test by start_test name"
   "opt:⚡:Optimization baseline"
   "  baseline:⚡:Run optimization baseline lane"
   "bench:📊:Benchmark lanes"
@@ -204,6 +205,16 @@ run_command() {
       local bench_args="${target#bench }"
       exec bash scripts/dev-bench.sh ${bench_args}
       ;;
+    "e2e test")
+      echo "  ${ERROR}Missing test name. Usage: dev e2e test \"<name substring>\"${NC}"
+      exit 1
+      ;;
+    "e2e test "*)
+      local test_name="${target#e2e test }"
+      echo "  ${ACCENT}${BOLD}🎯 Single E2E test${NC}"
+      echo ""
+      exec env E2E_LOGS="${E2E_LOGS:-show}" bash scripts/dev-e2e.sh "$test_name"
+      ;;
     "e2e"*)
       local suite="release"
       local filter=""
@@ -339,6 +350,16 @@ if [ $# -gt 0 ]; then
       fi
       ;;
     e2e)
+      if [ "${2:-}" = "test" ]; then
+        if [ $# -lt 3 ] || [ -z "${3:-}" ]; then
+          echo "  ${ERROR}Missing test name. Usage: dev e2e test \"<name substring>\"${NC}" >&2
+          exit 1
+        fi
+        echo ""
+        echo "  ${ACCENT}${BOLD}🎯 Single E2E test${NC}"
+        echo ""
+        exec env E2E_LOGS="${E2E_LOGS:-show}" bash scripts/dev-e2e.sh "$3"
+      fi
       if [ $# -eq 1 ] || [[ "${2:-}" == *=* ]]; then
         exec env E2E_LOGS="${E2E_LOGS:-hide}" bash scripts/e2e.sh release "${@:2}"
       fi

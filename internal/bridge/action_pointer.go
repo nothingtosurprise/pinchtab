@@ -435,25 +435,66 @@ func (b *Bridge) actionDrag(ctx context.Context, req ActionRequest) (map[string]
 }
 
 func (b *Bridge) actionHumanClick(ctx context.Context, req ActionRequest) (map[string]any, error) {
-	if req.NodeID > 0 {
-		// req.NodeID is a backendDOMNodeId from the accessibility tree
-		if err := ClickElement(ctx, cdp.BackendNodeID(req.NodeID)); err != nil {
-			return nil, err
-		}
-		return map[string]any{"clicked": true, "human": true}, nil
-	}
-	if req.Selector != "" {
+	var backendNodeID cdp.BackendNodeID
+	switch {
+	case req.NodeID > 0:
+		backendNodeID = cdp.BackendNodeID(req.NodeID)
+	case req.Selector != "":
 		node, err := firstNodeBySelector(ctx, req.Selector)
 		if err != nil {
 			return nil, err
 		}
-		// Use BackendNodeID from the DOM node
-		if err := ClickElement(ctx, node.BackendNodeID); err != nil {
-			return nil, err
-		}
-		return map[string]any{"clicked": true, "human": true}, nil
+		backendNodeID = node.BackendNodeID
+	default:
+		return nil, fmt.Errorf("need selector, ref, or nodeId")
 	}
-	return nil, fmt.Errorf("need selector, ref, or nodeId")
+
+	// Run the multi-step humanClick (bezier mouse-move + press + release) in
+	// a goroutine and poll for blocking dialogs. Without this, a dialog or
+	// dialog-like popup opened by the click would hang the renderer for the
+	// full action timeout. Mirrors the wrapping used by actionClick.
+	dm := b.GetDialogManager()
+	detectDialog := req.TabID != "" && dm != nil
+	clickCtx := ctx
+	var clickCancel context.CancelFunc
+	if detectDialog {
+		clickCtx, clickCancel = context.WithCancel(ctx)
+		defer clickCancel()
+	}
+
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- ClickElement(clickCtx, backendNodeID)
+	}()
+
+	if detectDialog {
+		ticker := time.NewTicker(dialogAutoHandlePollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case err := <-resultCh:
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"clicked": true, "human": true}, nil
+			case <-ticker.C:
+				if pending := dm.GetPending(req.TabID); pending != nil {
+					clickCancel()
+					return nil, &ErrDialogBlocking{
+						DialogType:    pending.Type,
+						DialogMessage: pending.Message,
+					}
+				}
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
+
+	if err := <-resultCh; err != nil {
+		return nil, err
+	}
+	return map[string]any{"clicked": true, "human": true}, nil
 }
 
 func (b *Bridge) actionScrollIntoView(ctx context.Context, req ActionRequest) (map[string]any, error) {

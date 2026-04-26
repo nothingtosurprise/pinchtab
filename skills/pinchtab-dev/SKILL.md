@@ -31,6 +31,7 @@ All development commands run via `./dev`:
 | `./dev e2e pr` | PR suite (api + cli + infra) |
 | `./dev e2e release` | Release suite (all extended) |
 | `./dev e2e docker` | Build local image and Docker smoke test |
+| `./dev e2e test "<name>"` | Run a single E2E test by `start_test` name |
 | `./dev doctor` | Setup dev environment |
 
 ## Architecture
@@ -131,9 +132,28 @@ go test ./internal/handlers  # Specific package
 ./dev e2e api clipboard                # Run only clipboard-basic.sh
 ./dev e2e api-extended "clipboard|console"  # Run clipboard and console tests
 ./dev e2e cli browser                  # Run browser-basic.sh in CLI suite
+
+# Run a single test by its start_test name (fastest debug loop)
+./dev e2e test "humanClick: click input by ref"
+./dev e2e test "scroll (down)"
+./dev e2e test "low-level mouse"
 ```
 
-The filter is a regex pattern matched against scenario filenames. Requires Docker daemon running.
+The scenario filter is a substring matched against scenario filenames. Requires Docker daemon running.
+
+#### Single-test mode (`dev e2e test "<name>"`)
+
+Use this when iterating on one specific E2E failure. The runner:
+
+1. Greps `tests/e2e/scenarios/**/*.sh` for `start_test "...<name substring>..."`.
+2. Auto-picks the suite (`api`/`cli`/`infra`/`plugin`) and `-extended` variant from the matching scenario file's path.
+3. Builds fresh images (`compose ... up --build`) and runs **only the matching `start_test`...`end_test` block** — the scenario preamble (helper sourcing, `FIXTURES_URL`, etc.) is preserved, every other test in the file is skipped.
+
+Notes:
+- The substring is literal (fgrep), so colons/parens/quotes in test names work without escaping.
+- If multiple tests match, the runner uses the first and prints the others — pass a longer/more-specific substring to disambiguate.
+- Logs stream to the terminal by default (unlike full suites which hide logs); helpful for debugging.
+- Implemented by `scripts/dev-e2e.sh` + `E2E_TEST_FILTER` plumbing through `scripts/e2e.sh` and `tests/e2e/run.sh`.
 
 ### Dashboard Tests
 ```bash

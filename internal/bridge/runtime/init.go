@@ -127,8 +127,24 @@ func setupAllocator(cfg *config.RuntimeConfig, bundle *stealth.Bundle, hooks Hoo
 		opts = append(opts, chromedp.Flag("hide-scrollbars", true))
 		opts = append(opts, chromedp.Flag("mute-audio", true))
 		opts = append(opts, chromedp.Flag("disable-vulkan", true))
+		// Use swiftshader (software GPU) for compositing under --headless=new.
+		// We deliberately do NOT pass --disable-gpu here: in new-headless
+		// mode Page.captureScreenshot routes through the compositor, which
+		// needs a GPU backend — disabling the GPU process leaves the
+		// compositor with no backend and screenshot calls hang past the
+		// action timeout.
 		opts = append(opts, chromedp.Flag("use-angle", "swiftshader"))
-		opts = append(opts, chromedp.DisableGPU)
+		// Chromium 121+ requires this opt-in to actually load the
+		// swiftshader backend; without it, --use-angle=swiftshader is
+		// silently ignored and the compositor has no backend, which
+		// manifests as Page.captureScreenshot/printToPDF hanging.
+		opts = append(opts, chromedp.Flag("enable-unsafe-swiftshader", true))
+		// Collapse the GPU process into the browser process. Saves one
+		// OS process and ~50-150MB per Chrome instance, and avoids the
+		// GPU-process sandbox negotiation in our --no-sandbox containers.
+		// Trade-off: a GPU code crash takes the browser with it, but the
+		// always-on strategy restarts instances anyway.
+		opts = append(opts, chromedp.Flag("in-process-gpu", true))
 	} else {
 		opts = append(opts, chromedp.Flag("headless", false))
 	}

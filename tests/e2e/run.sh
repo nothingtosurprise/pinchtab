@@ -218,6 +218,9 @@ if [ "$SUITE_KIND" = "api" ]; then
   if [ -n "$SCENARIO_FILTER" ]; then
     echo "FILTER: ${SCENARIO_FILTER}"
   fi
+  if [ -n "${E2E_TEST_FILTER:-}" ]; then
+    echo "TEST:   ${E2E_TEST_FILTER}"
+  fi
   if [ -n "$EXTRA_SCENARIOS" ]; then
     echo "EXTRA: ${EXTRA_SCENARIOS}"
   fi
@@ -255,6 +258,9 @@ else
   if [ -n "$SCENARIO_FILTER" ]; then
     echo "  Filter: $SCENARIO_FILTER"
   fi
+  if [ -n "${E2E_TEST_FILTER:-}" ]; then
+    echo "  Test:   ${E2E_TEST_FILTER}"
+  fi
   if [ -n "$EXTRA_SCENARIOS" ]; then
     echo "  Extra: $EXTRA_SCENARIOS"
   fi
@@ -276,6 +282,53 @@ else
   echo ""
 fi
 
+# When E2E_TEST_FILTER is set, source only scenario preamble + matching
+# start_test...end_test blocks. Lets a single test run end-to-end with the
+# scenario's setup intact, no per-helper guards needed.
+TEST_FILTER="${E2E_TEST_FILTER:-}"
+
+source_filtered_scenario() {
+  local script_path="$1"
+  local pattern="$2"
+  local script_dir
+  script_dir="$(dirname "${script_path}")"
+  # The scenarios dir may be read-only (runner mounts ./:/e2e:ro), so we
+  # write the filtered tempfile to /tmp. Scenarios resolve helper paths
+  # via `GROUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)`, which
+  # would point at /tmp from the tempfile — so we strip that line and
+  # pre-set GROUP_DIR to the original scenario directory instead.
+  # BusyBox mktemp (Alpine) needs the XXXXXX at the end of TEMPLATE — no
+  # trailing extension. Use an explicit /tmp path so behaviour is consistent
+  # across GNU and BusyBox.
+  local tmp
+  tmp=$(mktemp /tmp/e2e-scenario.XXXXXX)
+  printf 'GROUP_DIR=%q\n' "${script_dir}" > "${tmp}"
+  awk -v want="${pattern}" '
+    BEGIN { preamble=1; in_test=0; capture=0; matched=0 }
+    /^[[:space:]]*GROUP_DIR=.*BASH_SOURCE/ { next }
+    /^[[:space:]]*start_test[[:space:]]/ {
+      preamble=0
+      in_test=1
+      name=$0
+      sub(/^[[:space:]]*start_test[[:space:]]+/, "", name)
+      gsub(/^["'\'']|["'\'']$/, "", name)
+      if (index(name, want) > 0) { capture=1; matched=1 } else { capture=0 }
+    }
+    preamble || (in_test && capture) { print }
+    /^[[:space:]]*end_test[[:space:]]*$/ && in_test { in_test=0; capture=0 }
+    END { exit matched ? 0 : 2 }
+  ' "${script_path}" >> "${tmp}"
+  local awk_status=$?
+  if [ "${awk_status}" -eq 2 ]; then
+    rm -f "${tmp}"
+    return 2
+  fi
+  # shellcheck disable=SC1090
+  source "${tmp}"
+  rm -f "${tmp}"
+  return 0
+}
+
 # Run scenarios
 for script_name in "${SCENARIO_GROUPS[@]}"; do
   script_path="${GROUP_DIR}/${script_name}"
@@ -291,7 +344,13 @@ for script_name in "${SCENARIO_GROUPS[@]}"; do
   echo -e "${YELLOW}Running: ${script_name}${NC}"
   echo ""
   CURRENT_SCENARIO_FILE="${script_name%.sh}"
-  source "${script_path}"
+  if [ -n "${TEST_FILTER}" ]; then
+    if ! source_filtered_scenario "${script_path}" "${TEST_FILTER}"; then
+      echo -e "${MUTED}  no matching test in ${script_name}${NC}"
+    fi
+  else
+    source "${script_path}"
+  fi
   echo ""
 
   if [ -d "${RESULTS_DIR:-}" ] && [ -n "${E2E_PROGRESS_FILE:-}" ]; then

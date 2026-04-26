@@ -12,12 +12,16 @@ NC=$'\033[0m'
 
 # Parse arguments after suite
 E2E_FILTER=""
+E2E_TEST_FILTER=""
 E2E_EXTRA=""
 E2E_LOGS="${E2E_LOGS:-show}"
 for arg in "${@:2}"; do
   case "$arg" in
     filter=*)
       E2E_FILTER="${arg#filter=}"
+      ;;
+    test=*)
+      E2E_TEST_FILTER="${arg#test=}"
       ;;
     extra=*)
       E2E_EXTRA="${arg#extra=}"
@@ -47,8 +51,13 @@ done
 
 
 show_filter_status() {
-  if [ -n "${E2E_FILTER}" ]; then
-    echo "  ${MUTED}filter: ${E2E_FILTER}${NC}"
+  if [ -n "${E2E_FILTER}" ] || [ -n "${E2E_TEST_FILTER}" ]; then
+    if [ -n "${E2E_FILTER}" ]; then
+      echo "  ${MUTED}filter: ${E2E_FILTER}${NC}"
+    fi
+    if [ -n "${E2E_TEST_FILTER}" ]; then
+      echo "  ${MUTED}test:   ${E2E_TEST_FILTER}${NC}"
+    fi
     return
   fi
 
@@ -396,7 +405,7 @@ run_api() {
   [ -n "${E2E_FILTER}" ] && args+=("filter=${E2E_FILTER}")
   [ -n "${E2E_EXTRA}" ] && args+=("extra=${E2E_EXTRA}")
   if [ "${api_exit}" -eq 0 ]; then
-    run_logged_command "${output_file}" "${progress_file}" "running api suite" compose -f "${compose_file}" run --build --rm runner-api /bin/bash /e2e/run.sh api "${args[@]}"
+    run_logged_command "${output_file}" "${progress_file}" "running api suite" compose -f "${compose_file}" run --build --rm -e E2E_TEST_FILTER="${E2E_TEST_FILTER}" runner-api /bin/bash /e2e/run.sh api "${args[@]}"
     api_exit=$?
   fi
   set -e
@@ -429,7 +438,7 @@ run_api_extended() {
   run_logged_command "${output_file}" "" "building support images" build_support_images "${compose_file}"
   local api_exit=$?
   if [ "${api_exit}" -eq 0 ]; then
-    E2E_SUITE=api E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running api extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-api runner-api
+    E2E_SUITE=api E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" E2E_TEST_FILTER="${E2E_TEST_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running api extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-api runner-api
     api_exit=$?
   fi
   set -e
@@ -465,7 +474,7 @@ run_cli() {
   [ -n "${E2E_FILTER}" ] && args+=("filter=${E2E_FILTER}")
   [ -n "${E2E_EXTRA}" ] && args+=("extra=${E2E_EXTRA}")
   if [ "${cli_exit}" -eq 0 ]; then
-    run_logged_command "${output_file}" "${progress_file}" "running cli suite" compose -f "${compose_file}" run --build --rm runner-cli /bin/bash /e2e/run.sh cli "${args[@]}"
+    run_logged_command "${output_file}" "${progress_file}" "running cli suite" compose -f "${compose_file}" run --build --rm -e E2E_TEST_FILTER="${E2E_TEST_FILTER}" runner-cli /bin/bash /e2e/run.sh cli "${args[@]}"
     cli_exit=$?
   fi
   set -e
@@ -498,7 +507,7 @@ run_cli_extended() {
   run_logged_command "${output_file}" "" "building support images" build_support_images "${compose_file}"
   local cli_exit=$?
   if [ "${cli_exit}" -eq 0 ]; then
-    E2E_SUITE=cli E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running cli extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-cli runner-cli
+    E2E_SUITE=cli E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" E2E_TEST_FILTER="${E2E_TEST_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running cli extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-cli runner-cli
     cli_exit=$?
   fi
   set -e
@@ -534,7 +543,7 @@ run_infra() {
   [ -n "${E2E_FILTER}" ] && args+=("filter=${E2E_FILTER}")
   [ -n "${E2E_EXTRA}" ] && args+=("extra=${E2E_EXTRA}")
   if [ "${infra_exit}" -eq 0 ]; then
-    run_logged_command "${output_file}" "${progress_file}" "running infra suite" compose -f "${compose_file}" run --build --rm runner-api /bin/bash /e2e/run.sh infra "${args[@]}"
+    run_logged_command "${output_file}" "${progress_file}" "running infra suite" compose -f "${compose_file}" run --build --rm -e E2E_TEST_FILTER="${E2E_TEST_FILTER}" runner-api /bin/bash /e2e/run.sh infra "${args[@]}"
     infra_exit=$?
   fi
   set -e
@@ -567,7 +576,7 @@ run_infra_extended() {
   run_logged_command "${output_file}" "" "building support images" build_support_images "${compose_file}"
   local infra_exit=$?
   if [ "${infra_exit}" -eq 0 ]; then
-    E2E_SUITE=infra E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running infra extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-api runner-api
+    E2E_SUITE=infra E2E_EXTENDED=true E2E_SCENARIO_FILTER="${E2E_FILTER}" E2E_TEST_FILTER="${E2E_TEST_FILTER}" run_logged_command "${output_file}" "${progress_file}" "running infra extended suite" compose -f "${compose_file}" up --build --abort-on-container-exit --exit-code-from runner-api runner-api
     infra_exit=$?
   fi
   set -e
@@ -648,7 +657,7 @@ run_plugin() {
   # Plugin suite ignores E2E_FILTER since it only has plugin-basic.sh
   # and filters like "api-extended" don't make sense for it
   if [ "${plugin_exit}" -eq 0 ]; then
-    run_logged_command "${output_file}" "${progress_file}" "running plugin suite" compose -f "${compose_file}" run --build --rm runner-api /bin/bash /e2e/run.sh plugin "${args[@]}"
+    run_logged_command "${output_file}" "${progress_file}" "running plugin suite" compose -f "${compose_file}" run --build --rm -e E2E_TEST_FILTER="${E2E_TEST_FILTER}" runner-api /bin/bash /e2e/run.sh plugin "${args[@]}"
     plugin_exit=$?
   fi
   set -e

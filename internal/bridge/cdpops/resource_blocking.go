@@ -19,8 +19,15 @@ var MediaBlockPatterns = append(ImageBlockPatterns,
 func SetResourceBlocking(ctx context.Context, patterns []string) error {
 	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		if len(patterns) == 0 {
-			return network.SetBlockedURLs([]string{}).Do(ctx)
+			return network.SetBlockedURLs().Do(ctx)
 		}
-		return network.SetBlockedURLs(patterns).Do(ctx)
+		blockPatterns := make([]*network.BlockPattern, 0, len(patterns))
+		for _, pattern := range patterns {
+			if pattern == "" {
+				continue
+			}
+			blockPatterns = append(blockPatterns, &network.BlockPattern{URLPattern: pattern, Block: true})
+		}
+		return network.SetBlockedURLs().WithURLPatterns(blockPatterns).Do(ctx)
 	}))
 }

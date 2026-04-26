@@ -302,13 +302,24 @@ if (navigator.connection) {
   const screenHeight = Math.max(outerHeight + 80, 768);
   const chromeHeight = Math.max(screenHeight - outerHeight, 32);
   const availHeight = Math.max(outerHeight, screenHeight - chromeHeight);
-  
+
   Object.defineProperty(screen, 'width', { get: () => screenWidth, configurable: true });
   Object.defineProperty(screen, 'height', { get: () => screenHeight, configurable: true });
   Object.defineProperty(screen, 'availWidth', { get: () => screenWidth, configurable: true });
   Object.defineProperty(screen, 'availHeight', { get: () => availHeight, configurable: true });
   Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true });
   Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true });
+
+  // Chromium --headless=new returns outerWidth/outerHeight = 0 by default,
+  // which is a strong bot signal (real browsers always have non-zero outer
+  // dims). Backfill them only when missing — full-level stealth replaces
+  // these with more sophisticated values further down.
+  if (!(window.outerWidth > 0)) {
+    try { Object.defineProperty(window, 'outerWidth', { get: () => outerWidth, configurable: true }); } catch (e) {}
+  }
+  if (!(window.outerHeight > 0)) {
+    try { Object.defineProperty(window, 'outerHeight', { get: () => outerHeight, configurable: true }); } catch (e) {}
+  }
 })();
 
 if (!(window.devicePixelRatio > 0)) {

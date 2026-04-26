@@ -30,7 +30,7 @@ RUN go build -ldflags="-s -w" -o pinchtab ./cmd/pinchtab
 # - Container provides isolation via cgroups, seccomp, dropped capabilities,
 #   read-only filesystem, and non-root user
 # - This matches best practices for headless Chrome in containerized environments
-FROM alpine:3.21
+FROM alpine:3.23
 
 LABEL org.opencontainers.image.source="https://github.com/pinchtab/pinchtab"
 LABEL org.opencontainers.image.description="High-performance browser automation bridge"
