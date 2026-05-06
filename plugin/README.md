@@ -2,6 +2,8 @@
 
 Browser control for AI agents via [PinchTab](https://pinchtab.com). Single-tool design — one `pinchtab` tool handles all browser operations. Minimal context bloat.
 
+> **Beta**: this plugin is in beta and is not fully tested in this release. Expect rough edges around per-agent session isolation, the `browser` compatibility alias, and OpenClaw plugin loader behavior. Production use is at your own risk — please file issues for anything you hit.
+
 ## Install
 
 ```bash
@@ -223,7 +225,7 @@ pinchtab({ action: "wait", text: "Welcome back", timeout: 120000 })
 
 ## Security Notes
 
-- **Auto-start** spawns a background process — only enabled for local addresses (`localhost`, `127.0.0.1`, `::1`). Set `autoStart: false` if you prefer explicit server management.
+- **Server lifecycle**: the plugin does not start PinchTab — run `pinchtab server` separately. If the server isn't reachable, the plugin returns a clear error pointing at the configured `baseUrl`. Once the server is up, the plugin briefly waits for instance/profile readiness (handles the "still booting" / `503` window).
 - **`evaluate`** is blocked by default (`allowEvaluate: false`) — enable only for trusted agents
 - **`downloads`** and **`uploads`** are blocked by default — enable only when the task requires file transfer
 - **Cookie access** exposes session credentials — do not log or expose to untrusted contexts

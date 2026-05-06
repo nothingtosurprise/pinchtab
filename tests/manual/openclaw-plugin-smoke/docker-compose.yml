@@ -25,7 +25,7 @@ services:
       [
         "/bin/sh",
         "-lc",
-        "cp /fixture-config/pinchtab.json /data/pinchtab.json && /usr/local/bin/docker-entrypoint.sh pinchtab 2>&1 | tee /artifacts/pinchtab.log",
+        "cp /fixture-config/pinchtab.json /data/pinchtab.json && /usr/local/bin/docker-entrypoint.sh pinchtab server 2>&1 | tee /artifacts/pinchtab.log",
       ]
     volumes:
       - ./pinchtab.config.json:/fixture-config/pinchtab.json:ro
@@ -54,6 +54,7 @@ services:
       PINCHTAB_BASE_URL: http://pinchtab:9999
       PINCHTAB_TOKEN: smoke-token
       FIXTURES_URL: http://fixtures:8080
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - ${OPENCLAW_STATE_DIR}:/root/.openclaw
       - ../../../:/workspace

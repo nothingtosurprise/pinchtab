@@ -1,4 +1,4 @@
-import type { AnyAgentTool, OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
+import type { AnyAgentTool, OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk/plugin-entry";
 
 export interface PluginConfig {
   baseUrl?: string;
@@ -23,7 +23,6 @@ export interface PluginConfig {
 
 export interface PluginRuntimeContext {
   agentId?: string;
-  agentName?: string;
   sessionId?: string;
   sessionKey?: string;
 }

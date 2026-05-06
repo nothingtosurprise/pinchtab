@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import type { AnyAgentTool, OpenClawPluginApi, OpenClawPluginToolContext, PluginLogger, PluginRuntime } from "openclaw/plugin-sdk";
+import type { AnyAgentTool, OpenClawPluginApi, OpenClawPluginToolContext, PluginLogger } from "openclaw/plugin-sdk/plugin-entry";
+import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
 import pluginEntry from "./index.ts";
 
 type RegisteredToolOptions = Parameters<OpenClawPluginApi["registerTool"]>[1];
@@ -125,7 +126,7 @@ describe("OpenClaw plugin API contract", () => {
       assert.strictEqual(typeof tool.description, "string");
       assert.strictEqual(typeof tool.execute, "function");
       assert.strictEqual((tool.parameters as { type?: string }).type, "object");
-      assert.strictEqual(opts, undefined);
+      assert.deepStrictEqual(opts, { optional: true });
     }
   });
 

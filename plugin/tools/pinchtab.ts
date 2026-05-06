@@ -1,7 +1,7 @@
 import type { PluginConfig, PluginRuntimeContext } from "../types.js";
 import { pinchtabFetch, textResult, imageResult, resourceResult, normalizeActionParams, looksLikeStaleRef } from "../client.js";
 import { checkNavigationPolicy, checkEvaluatePolicy, checkDownloadPolicy, checkUploadPolicy, checkNetworkInterceptPolicy, enforcePolicyOrReturn } from "../policy.js";
-import { ensureServerRunning, waitForInstanceReady, getEnhancedHealth, getLastTabId, rememberRuntimeContext, setLastTabId } from "../session.js";
+import { ensureServerRunning, waitForInstanceReady, getEnhancedHealth, getLastTabId, rememberRuntimeContext, resolveEffectiveConfig, setLastTabId } from "../session.js";
 
 export const pinchtabToolSchema = {
   type: "object",
@@ -90,8 +90,9 @@ export const pinchtabToolDescription = `Browser control via Pinchtab. Actions:
 
 Token strategy: use "text" for reading (~800 tokens), "snapshot" with filter=interactive&format=compact for interactions (~3,600), diff=true on subsequent snapshots.`;
 
-export async function executePinchtabAction(cfg: PluginConfig, params: any, context?: PluginRuntimeContext): Promise<any> {
+export async function executePinchtabAction(rawCfg: PluginConfig, params: any, context?: PluginRuntimeContext): Promise<any> {
   rememberRuntimeContext(context);
+  const cfg = await resolveEffectiveConfig(rawCfg);
   const normalized = normalizeActionParams(params);
   const { action } = normalized;
 
@@ -253,7 +254,7 @@ export async function executePinchtabAction(cfg: PluginConfig, params: any, cont
       if (!running) {
         return textResult({ ...listed, warning: "No tabs returned and no running instance found." });
       }
-      const instanceTabs = await pinchtabFetch(cfg, `/instances/${running.id}/tabs`, {}, context);
+      const instanceTabs = await pinchtabFetch(cfg, `/instances/${encodeURIComponent(running.id)}/tabs`, {}, context);
       return textResult({ source: "instance-fallback", instanceId: running.id, tabs: instanceTabs?.tabs ?? instanceTabs });
     }
     if (tabAction === "close") {
@@ -332,7 +333,7 @@ export async function executePinchtabAction(cfg: PluginConfig, params: any, cont
     }
 
     if (networkAction === "get" && normalized.requestId) {
-      return textResult(await pinchtabFetch(cfg, `/network/${normalized.requestId}`, {}, context));
+      return textResult(await pinchtabFetch(cfg, `/network/${encodeURIComponent(normalized.requestId)}`, {}, context));
     }
 
     if (networkAction === "export") {

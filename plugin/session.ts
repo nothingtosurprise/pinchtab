@@ -6,12 +6,28 @@ import { pinchtabFetch } from "./client.js";
 
 const instanceReadyRetryDelayMs = 500;
 const instanceReadyMaxWaitMs = 12000;
+const agentSessionMaxEntries = 256;
+const agentSessionMaxAgeMs = 60 * 60 * 1000;
 
 const agentSessions = new Map<string, AgentSessionState>();
-let discoveredConfig: { baseUrl?: string; token?: string } | null | undefined;
 
 function resolveSessionStateKey(context?: PluginRuntimeContext): string {
   return context?.agentId || context?.sessionId || "global";
+}
+
+function pruneAgentSessions(): void {
+  const cutoff = Date.now() - agentSessionMaxAgeMs;
+  for (const [key, state] of agentSessions) {
+    if ((state.updatedAt ?? 0) < cutoff) agentSessions.delete(key);
+  }
+  if (agentSessions.size <= agentSessionMaxEntries) return;
+  const ordered = [...agentSessions.entries()].sort(
+    (a, b) => (a[1].updatedAt ?? 0) - (b[1].updatedAt ?? 0),
+  );
+  for (const [key] of ordered) {
+    if (agentSessions.size <= agentSessionMaxEntries) break;
+    agentSessions.delete(key);
+  }
 }
 
 export function rememberRuntimeContext(context?: PluginRuntimeContext): AgentSessionState {
@@ -20,13 +36,13 @@ export function rememberRuntimeContext(context?: PluginRuntimeContext): AgentSes
   const next: AgentSessionState = {
     key,
     agentId: context?.agentId ?? existing?.agentId,
-    agentName: context?.agentName ?? existing?.agentName,
     sessionId: context?.sessionId ?? existing?.sessionId,
     sessionKey: context?.sessionKey ?? existing?.sessionKey,
     lastTabId: existing?.lastTabId,
     updatedAt: Date.now(),
   };
   agentSessions.set(key, next);
+  pruneAgentSessions();
   return next;
 }
 
@@ -65,7 +81,6 @@ export function setLastTabId(tabId: string | undefined, context?: PluginRuntimeC
   const state = rememberRuntimeContext(context);
   state.lastTabId = tabId;
   state.updatedAt = Date.now();
-  agentSessions.set(state.key, state);
 }
 
 export function resolveProfile(
@@ -85,10 +100,6 @@ export function resolveProfile(
 }
 
 async function discoverPinchtabConfig(): Promise<{ baseUrl?: string; token?: string } | null> {
-  if (discoveredConfig !== undefined) {
-    return discoveredConfig;
-  }
-
   try {
     const path = join(homedir(), ".pinchtab", "config.json");
     const raw = await readFile(path, "utf8");
@@ -103,14 +114,12 @@ async function discoverPinchtabConfig(): Promise<{ baseUrl?: string; token?: str
       baseUrl = `http://${host}:${port}`;
     }
 
-    discoveredConfig = {
+    return {
       baseUrl,
       token: typeof token === "string" && token ? token : undefined,
     };
-    return discoveredConfig;
   } catch {
-    discoveredConfig = null;
-    return discoveredConfig;
+    return null;
   }
 }
 
@@ -119,6 +128,7 @@ export function formatDiscoveredBaseUrl(bind: string, port: string | number): st
 }
 
 export async function resolveEffectiveConfig(cfg: PluginConfig): Promise<PluginConfig> {
+  if (cfg.baseUrl && cfg.token) return cfg;
   const discovered = await discoverPinchtabConfig();
   return {
     ...cfg,
@@ -128,28 +138,26 @@ export async function resolveEffectiveConfig(cfg: PluginConfig): Promise<PluginC
 }
 
 export async function getEnhancedHealth(cfg: PluginConfig, context?: PluginRuntimeContext): Promise<any> {
-  const effectiveCfg = await resolveEffectiveConfig(cfg);
-  const base = effectiveCfg.baseUrl || "http://localhost:9867";
-  const health = await pinchtabFetch(effectiveCfg, "/health", {}, context);
+  const base = cfg.baseUrl || "http://localhost:9867";
+  const health = await pinchtabFetch(cfg, "/health", {}, context);
   const serverOk = !health?.error;
   const agentSession = getAgentSessionState(context);
 
   const result: any = {
     server: serverOk ? "ok" : "unreachable",
     baseUrl: base,
-    defaultProfile: effectiveCfg.defaultProfile || "openclaw",
+    defaultProfile: cfg.defaultProfile || "openclaw",
     policies: {
-      allowEvaluate: effectiveCfg.allowEvaluate === true,
-      allowDownloads: effectiveCfg.allowDownloads === true,
-      allowUploads: effectiveCfg.allowUploads === true,
-      allowedDomains: effectiveCfg.allowedDomains?.length ? effectiveCfg.allowedDomains : "all",
+      allowEvaluate: cfg.allowEvaluate === true,
+      allowDownloads: cfg.allowDownloads === true,
+      allowUploads: cfg.allowUploads === true,
+      allowedDomains: cfg.allowedDomains?.length ? cfg.allowedDomains : "all",
     },
   };
 
   if (agentSession) {
     result.agentSession = {
       agentId: agentSession.agentId,
-      agentName: agentSession.agentName,
       sessionId: agentSession.sessionId,
       sessionKey: agentSession.sessionKey,
       lastTabId: agentSession.lastTabId,
@@ -167,8 +175,8 @@ export async function getEnhancedHealth(cfg: PluginConfig, context?: PluginRunti
   }
 
   const warnings: string[] = [];
-  if (effectiveCfg.allowEvaluate) warnings.push("evaluate enabled - JS execution allowed");
-  if (!effectiveCfg.allowedDomains?.length) warnings.push("no domain restrictions");
+  if (cfg.allowEvaluate) warnings.push("evaluate enabled - JS execution allowed");
+  if (!cfg.allowedDomains?.length) warnings.push("no domain restrictions");
   if (warnings.length) result.warnings = warnings;
 
   return result;
@@ -177,10 +185,9 @@ export async function getEnhancedHealth(cfg: PluginConfig, context?: PluginRunti
 export async function ensureServerRunning(
   cfg: PluginConfig,
   context?: PluginRuntimeContext,
-): Promise<{ ok: boolean; error?: string; autoStarted?: boolean }> {
-  const effectiveCfg = await resolveEffectiveConfig(cfg);
-  const base = effectiveCfg.baseUrl || "http://localhost:9867";
-  const healthCheck = await pinchtabFetch(effectiveCfg, "/health", {}, context);
+): Promise<{ ok: boolean; error?: string }> {
+  const base = cfg.baseUrl || "http://localhost:9867";
+  const healthCheck = await pinchtabFetch(cfg, "/health", {}, context);
   if (!healthCheck?.error) {
     return { ok: true };
   }
@@ -196,14 +203,13 @@ export async function waitForInstanceReady(
   instanceId?: string,
   context?: PluginRuntimeContext,
 ): Promise<{ ok: boolean; error?: string }> {
-  const effectiveCfg = await resolveEffectiveConfig(cfg);
   const start = Date.now();
   let lastError = "instance not ready";
 
   while (Date.now() - start < instanceReadyMaxWaitMs) {
-    const health = await pinchtabFetch(effectiveCfg, "/health", {}, context);
+    const health = await pinchtabFetch(cfg, "/health", {}, context);
     if (!health?.error) {
-      const instances = await pinchtabFetch(effectiveCfg, "/instances", {}, context);
+      const instances = await pinchtabFetch(cfg, "/instances", {}, context);
       const list = Array.isArray(instances?.value)
         ? instances.value
         : Array.isArray(instances)
@@ -227,7 +233,7 @@ export async function waitForInstanceReady(
       continue;
     }
 
-    const tabs = await pinchtabFetch(effectiveCfg, "/tabs", {}, context);
+    const tabs = await pinchtabFetch(cfg, "/tabs", {}, context);
     if (!tabs?.error) {
       return { ok: true };
     }

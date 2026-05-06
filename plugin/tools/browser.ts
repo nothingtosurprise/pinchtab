@@ -1,7 +1,7 @@
 import type { PluginConfig, PluginRuntimeContext } from "../types.js";
 import { pinchtabFetch, textResult, imageResult, resourceResult } from "../client.js";
 import { checkNavigationPolicy, enforcePolicyOrReturn } from "../policy.js";
-import { ensureServerRunning, waitForInstanceReady, getEnhancedHealth, resolveProfile, getLastTabId, rememberRuntimeContext, setLastTabId } from "../session.js";
+import { ensureServerRunning, waitForInstanceReady, getEnhancedHealth, resolveEffectiveConfig, resolveProfile, getLastTabId, rememberRuntimeContext, setLastTabId } from "../session.js";
 
 export const browserToolSchema = {
   type: "object",
@@ -43,8 +43,10 @@ Actions:
 
 Profiles: "openclaw" (default isolated), "user" (attach to existing session)`;
 
-export async function executeBrowserAction(cfg: PluginConfig, params: any, context?: PluginRuntimeContext): Promise<any> {
+export async function executeBrowserAction(rawCfg: PluginConfig, rawParams: any, context?: PluginRuntimeContext): Promise<any> {
   rememberRuntimeContext(context);
+  const cfg = await resolveEffectiveConfig(rawCfg);
+  const params = { ...rawParams };
   const { action, profile } = params;
 
   // Resolve profile to instance

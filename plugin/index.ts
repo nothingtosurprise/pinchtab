@@ -42,7 +42,7 @@ export default definePluginEntry({
         },
       } satisfies PluginTool;
       return pinchtabTool;
-    });
+    }, { optional: true });
 
     if (cfg.registerBrowserTool !== false) {
       api.registerTool((ctx) => {
@@ -57,7 +57,7 @@ export default definePluginEntry({
           },
         } satisfies PluginTool;
         return browserTool;
-      });
+      }, { optional: true });
     }
   },
 });
