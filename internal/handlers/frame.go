@@ -280,7 +280,7 @@ func (h *Handlers) resolveFrameScope(ctx context.Context, tabID, target string) 
 	ownerMap := bridge.FrameOwnerMap(ctx, frameTree)
 	if hasRefScope {
 		if refScope.FrameID == rootFrameID {
-			return bridge.FrameScope{}, true, nil
+			return bridge.FrameScope{}, false, fmt.Errorf("ref %q is not an iframe owner; pass an iframe ref, a CSS selector, or the frame URL/name", sel.Value)
 		}
 		return refScope, false, nil
 	}

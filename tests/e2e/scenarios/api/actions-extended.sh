@@ -752,3 +752,84 @@ assert_ok "evaluate dialog result"
 assert_json_eq "$RESULT" '.result' 'PROMPT_CANCELLED' "prompt was cancelled"
 
 end_test
+
+# ─────────────────────────────────────────────────────────────────
+# Regression: ref-based frame scoping (`/frame {target: "eN"}`).
+# Three bugs were fixed together:
+#   1) FrameOwnerMap called dom.GetFrameOwner without a chromedp.Run
+#      wrapper, returning err="invalid context" → empty owner map.
+#   2) FetchAXTree iterated frames root-first; pierce:true on the root
+#      let the seen[] dedup drop child-frame nodes before they could be
+#      tagged with their real FrameID/FrameOwnerNodeID.
+#   3) resolveFrameScope silently reset to main when an iframe ref had
+#      no ChildFrameID, returning HTTP 200 + scoped:false (looked OK).
+# Together these meant `pinchtab frame eN` was a silent no-op even when
+# eN was clearly an iframe in the snap.
+start_test "iframe: /frame target=eN drills into child frame (ref-based scoping)"
+
+navigate_fixture "iframe.html" 0
+fresh_snapshot
+
+IFRAME_REF=$(echo "$RESULT" | jq -r '[.nodes[] | select(.role == "Iframe")][0].ref // empty')
+[ -n "$IFRAME_REF" ] || fail_assert "snapshot did not expose any Iframe ref"
+
+# Fix 1+2: snapshot must populate childFrameId on the iframe owner ref.
+assert_json_exists "$RESULT" \
+  ".nodes[] | select(.ref == \"${IFRAME_REF}\") | select(.childFrameId != null and .childFrameId != \"\")" \
+  "iframe ref ${IFRAME_REF} carries non-empty childFrameId"
+
+# Fix 3 (positive path): drilling by ref must succeed and report the child URL.
+pt_post /frame -d "{\"target\":\"${IFRAME_REF}\"}"
+assert_ok "frame target=${IFRAME_REF} (ref) succeeds"
+assert_json_eq "$RESULT" '.scoped' 'true' "ref-based frame scoping reports scoped=true"
+assert_json_contains "$RESULT" '.current.frameUrl' 'iframe-content.html' \
+  "scoped frame url points at iframe-content.html"
+
+# Reset to main for the next case.
+pt_post /frame -d '{"target":"main"}'
+assert_json_eq "$RESULT" '.scoped' 'false' "reset back to main"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+# Regression: /frame target=eN must error (not silently no-op) when the
+# ref points to a non-iframe element in the main frame. Before fix #3
+# this returned HTTP 200 with scoped:false — indistinguishable from a
+# successful "reset to main" — making the bug invisible to clients.
+start_test "iframe: /frame target=eN errors when ref is not an iframe owner"
+
+navigate_fixture "iframe.html" 0
+fresh_snapshot
+
+# Pick any non-iframe ref in main (a heading or paragraph is fine).
+NON_IFRAME_REF=$(echo "$RESULT" | jq -r '[.nodes[] | select(.role != "Iframe" and .role != "RootWebArea")][0].ref // empty')
+[ -n "$NON_IFRAME_REF" ] || fail_assert "snapshot had no non-iframe ref to test against"
+
+pt_post /frame -d "{\"target\":\"${NON_IFRAME_REF}\"}"
+assert_http_error 400 "is not an iframe owner" \
+  "frame target=${NON_IFRAME_REF} (non-iframe ref) returns 400 with iframe-owner message"
+
+end_test
+
+# ─────────────────────────────────────────────────────────────────
+# Regression: the iframe owner ref discovered in the *outer* page snap
+# must keep drilling correctly when the iframe sits inside another
+# iframe (i.e. `Iframe` role discovered via the same-origin pierce).
+# The flat snap of nested-iframe-outer.html exposes the inner-payment
+# iframe directly because pierce:true descends into the outer frame.
+start_test "iframe: /frame target=eN drills into iframe surfaced via same-origin pierce"
+
+navigate_fixture "nested-iframe-outer.html" 0
+fresh_snapshot
+
+NESTED_IFRAME_REF=$(echo "$RESULT" | jq -r '[.nodes[] | select(.role == "Iframe")][0].ref // empty')
+[ -n "$NESTED_IFRAME_REF" ] || fail_assert "no Iframe ref surfaced from pierced outer fixture"
+
+pt_post /frame -d "{\"target\":\"${NESTED_IFRAME_REF}\"}"
+assert_json_eq "$RESULT" '.scoped' 'true' "scoped into pierced inner iframe"
+assert_json_contains "$RESULT" '.current.frameUrl' 'nested-iframe-inner.html' \
+  "scoped frame url points at nested-iframe-inner.html"
+
+pt_post /frame -d '{"target":"main"}'
+
+end_test

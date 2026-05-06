@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -105,7 +106,12 @@ func FrameOwnerMap(ctx context.Context, tree RawFrameTree) map[string]int64 {
 	walk = func(t RawFrameTree) {
 		for _, child := range t.ChildFrames {
 			if child.Frame.ID != "" {
-				backendNodeID, _, err := dom.GetFrameOwner(cdp.FrameID(child.Frame.ID)).Do(ctx)
+				var backendNodeID cdp.BackendNodeID
+				err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+					var innerErr error
+					backendNodeID, _, innerErr = dom.GetFrameOwner(cdp.FrameID(child.Frame.ID)).Do(ctx)
+					return innerErr
+				}))
 				if err == nil && backendNodeID != 0 {
 					owners[child.Frame.ID] = int64(backendNodeID)
 				}
@@ -147,6 +153,13 @@ func FetchAXTree(ctx context.Context) ([]RawAXNode, error) {
 	if len(ids) == 0 {
 		return fetchAXTreeForFrame(ctx, "")
 	}
+	// Process child frames before the root: the root fetch uses pierce:true
+	// and returns child-frame nodes too, but tags them with FrameID=root and
+	// FrameOwnerNodeID=0. The seen[] dedup below is first-writer-wins, so
+	// leaf frames must run first to claim those nodes with the correct
+	// FrameID + FrameOwnerNodeID. Without this, ChildFrameID never gets set
+	// on iframe owner refs and `frame eN` silently no-ops.
+	slices.Reverse(ids)
 
 	merged := make([]RawAXNode, 0, 256)
 	seen := make(map[string]bool, 256)
